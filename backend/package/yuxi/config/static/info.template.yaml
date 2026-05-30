@@ -3,59 +3,46 @@
 
 # 组织信息
 organization:
-  name: "江南语析"           # 完整组织名称
+  name: "DreamOS"            # 完整组织名称
   logo: "/favicon.svg"       # Logo文件路径（放在 web/public 目录下）
   avatar: "/avatar.jpg"      # 头像文件路径（放在 web/public 目录下）
   login_bg: "/login-bg.jpg"  # 登录背景图片路径（放在 web/public 目录下）
 
 # 项目信息
 branding:
-  name: "Yuxi"
-  title: "让智能体可构建、可编排、可落地"     # 系统标题
-  subtitle: "开源智能体平台套件，融合 RAG 与知识图谱"          # 副标题（subtitles 为空时使用）
+  name: "DreamOS"
+  title: "DreamOS"     # 系统标题
+  subtitle: "融合 RAG、知识图谱与智能体编排的知识中枢"          # 副标题（subtitles 为空时使用）
+  badge: "RAG · Knowledge Graph · Agent Workflow"
   subtitles:
-    - "开源智能体平台套件，融合 RAG 与知识图谱"
-    - "统一编排 Agent、知识库、图谱与工具链"
-    - "让智能体可构建，让知识可连接，让决策可验证"
-    - "让智能体可落地，让流程可编排，让协作可扩展"
-    - "让数据可沉淀，让能力可复用，让系统可进化"
+    - "融合 RAG、知识图谱与智能体编排的知识中枢"
+    - "统一管理知识库、模型、Agent 与工具链"
+    - "让文档可检索，让知识可关联，让回答可追溯"
+    - "支持多步骤任务编排与异步智能体运行"
+    - "面向个人与团队知识管理的 AI 应用底座"
 
 features:
-  - label: "GitHub Stars"
-    value: "4800+"
-    description: "开发者社区的认可与支持"
-    icon: "stars"
-  - label: "已解决 Issues"
-    value: "300+"
-    description: "持续改进和问题解决能力"
-    icon: "issues"
-  - label: "累计 Commits"
-    value: "1600+"
-    description: "活跃的开发迭代和功能更新"
-    icon: "commits"
-  - label: "开源协议"
-    value: "MIT License"
-    description: "完全免费，支持商业使用"
-    icon: "license"
-
-actions:
-  - name: "演示视频"
-    icon: "video"
-    url: "https://www.bilibili.com/video/BV1DF14BTETq"
-  - name: "文档中心"
-    icon: "docs"
-    url: "https://xerrors.github.io/Yuxi/"
-  - name: "提交 Issue"
-    icon: "issue"
-    url: "https://github.com/xerrors/Yuxi/issues/new/choose"
-  - name: "开发路线图"
-    icon: "roadmap"
-    url: "https://xerrors.github.io/Yuxi/develop-guides/roadmap.html"
+  - label: "RAG 知识库"
+    value: "文档问答"
+    description: "支持文档解析、分块、向量检索与引用追溯"
+    icon: "knowledge"
+  - label: "知识图谱"
+    value: "关系推理"
+    description: "融合图数据库查询，增强复杂知识关联分析"
+    icon: "graph"
+  - label: "智能体编排"
+    value: "工具调用"
+    description: "支持 Agent 配置、上下文管理与多步骤任务执行"
+    icon: "agent"
+  - label: "容器化部署"
+    value: "一键启动"
+    description: "通过 Docker Compose 编排前后端与多类存储服务"
+    icon: "deploy"
 
 
 
 # 页脚信息
 footer:
-  copyright: "© 江南语析 2026 v{{YUXI_VERSION}}"
+  copyright: "© DreamOS 2026"
   user_agreement_url: "/protocols/user-agreement.template.html"
   privacy_policy_url: "/protocols/privacy-policy.template.html"
