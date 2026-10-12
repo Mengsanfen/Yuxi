@@ -1,230 +1,87 @@
+# NexaMind Enterprise
 
-<div align="center">
-<h1>语析 - 基于大模型的知识库与知识图谱智能体开发平台</h1>
+基于开源 [Yuxi](https://github.com/xerrors/Yuxi) 二次开发的企业级 Agent 客服与售后自动化平台。上游提供通用 LangGraph 智能体运行时、知识库/知识图谱、MCP、Skills、沙盒和 Vue/FastAPI 基础；本仓库的企业二开聚焦订单、退款、工单、人工审批、租户权限、评测和业务追踪。代码仍保留 `yuxi` 包名。
 
-[![](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=ffffff)](https://github.com/xerrors/Yuxi/blob/main/docker-compose.yml)
-[![](https://img.shields.io/github/issues/xerrors/Yuxi?color=F48D73)](https://github.com/xerrors/Yuxi/issues)
-[![License](https://img.shields.io/github/license/bitcookies/winrar-keygen.svg?logo=github)](https://github.com/xerrors/Yuxi/blob/main/LICENSE)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-blue.svg)](https://deepwiki.com/xerrors/Yuxi)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/xerrors/Yuxi)
-[![demo](https://img.shields.io/badge/demo-00A1D6.svg?style=flat&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1DF14BTETq/)
+> 项目定位：可在本地 Docker Compose 环境演示和测试的企业客服样例。当前不宣称已完成生产部署或取得未经实测的模型效果指标。
 
+## 企业场景
 
-<a href="https://trendshift.io/repositories/24335" target="_blank"><img src="https://trendshift.io/api/badge/repositories/24335" alt="xerrors%2FYuxi | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+- 企业政策与产品知识问答：复用 Yuxi RAG，返回可核对的检索来源。
+- 订单与物流查询：按当前用户的部门租户读取真实业务记录。
+- 退款与售后：确定性规则决定自动处理或进入人工审批，支持工单状态流转。
+- 运行追踪：查看意图、节点、Tool、审批恢复、Quality Gate 和最终状态。
 
-</div>
+## 架构图
 
-![arch](https://xerrors.oss-cn-shanghai.aliyuncs.com/github/gpt-iamge-2-arch.png)
-
-
-**图由 GPT-Image-2 生成*
-
-## 核心特性
-
-- **智能体开发**：基于 LangGraph，支持子智能体、Skills、MCPs、Tools 与中间件机制
-- **知识库（RAG）**：多格式文档上传，支持 Embedding / Rerank 配置及知识库评估
-- **知识图谱**：基于 LightRAG 的图谱构建与可视化，支持属性图谱并参与智能体推理
-- **平台与工程化**：Vue + FastAPI 架构，支持暗黑模式、Docker 与生产级部署
-
-
-## 你可以用语析做什么？
-
-- 构建 **面向真实业务的 RAG + 知识图谱智能体**
-- 将 PDF / Word / Markdown / 图片快速转化为可推理的知识库
-- 自动（LightRAG）或手动构建知识图谱，并用于智能体推理
-- 使用 LangGraph v1 构建多智能体 / 子智能体系统
-
-## 最新动态
-
-
-<details>
-<summary>[2026/04/01] v0.6.0 版本发布</summary>
-
-### 新增
-
-- 重构后端代码 src -> backend/package/yuxi
-- 重构文档解析，统一文档解析体验，并新增 Parser 类
-- 新增 LITE 模式启动，启动时不加载知识库、知识图谱相关模块，可以使用 make up-lite 快捷启动
-- 新增沙盒环境，详见后续文档更新，统一沙盒虚拟路径前缀默认值为 `/home/gem/user-data`
-- 新增基于沙盒的文件系统，前端工作台可以查看文件系统，支持预览（文本、图片、PDF、HTML）、下载文件
-- 新增 `present_artifacts` 内置工具：Agent 可将 `/home/gem/user-data/outputs/` 下的结果文件显式写入 LangGraph state 的 `artifacts` 字段，前端支持在输入框顶部以默认折叠的堆叠卡片展示本轮交付物文件，并保持可下载、可预览能力
-- 新增基于沙盒的知识库只读映射，按“用户可访问知识库 ∩ 当前 Agent 已启用知识库”暴露原始文件与解析后的 Markdown
-- 重构附件系统，直接集成在了沙盒文件系统中，附件上传后直接落盘到沙盒挂载目录
-- 优化前端流式消息体验：新增通用 `useStreamSmoother` 调度层，统一平滑 Agent runs SSE、普通聊天流与审批恢复流中的 `loading` chunk
-- 优化项目文档说明，并添加贡献指南
-- 重构前端 Agent 路由结构，体验更加顺畅，切换更加自然（类 chatgpt 体验）
-- 新增 API Key 认证功能，支持外部系统通过 API Key 调用系统服务
-- 新增 subagents 的支持，支持在 web 中添加 subagents，以及两个内置的子智能体
-- 新增内置Skills reporter，并移除内置 Agent reporter，数据库报表将由 Skills 完成
-- 新增内置 Skills `deep-reporter`，用于指导生成科研报告、行业调研和其他深度分析类长报告
-- 重构内置 Skills/MCP/Subagents 安装/添加/移除机制：内置 skill 支持按需安装、基于 `version + content_hash` 的更新提示与覆盖确认，不再使用服务器级开关切换
-- 新增知识库 PDF、图片的预览功能
-- 重构后端测试目录结构：按 `unit / integration / e2e` 分层迁移现有测试，拆分全局 `conftest.py`，统一测试入口为 `uv run --group test pytest`，并新增独立测试规范文档 `docs/vibe/testing-guidelines.md`
-
-
-### 修复
-
-- 修复 Lightrag 知识库修改配置后，模型没有切换的 bug [#580](https://github.com/xerrors/Yuxi/issues/580)
-- 修复数据库获取接口未过滤文件字段而导致的数据包过大的情况
-- 修复 Thread 未绑定 agent_config_id 导致的历史对话切换后上下文配置错乱的问题
-
-
-</details>
-
-<details>
-<summary>[2026/03/01] v0.5.0 版本发布</summary>
-
-详见 [changelog](docs/develop-guides/changelog.md)
-
-</details>
-
-<details>
-<summary>[2025/12/19] v0.4.0 版本发布</summary>
-
-详见 [changelog](docs/develop-guides/changelog.md)
-
-</details>
-
-<details>
-<summary>[2025/11/05] v0.3.0 版本发布</summary>
-
-详见 [changelog](docs/develop-guides/changelog.md)
-
-</details>
-
-## 快速开始
-
-克隆代码，并初始化
-
-```
-git clone --branch v0.6.1 --depth 1 https://github.com/xerrors/Yuxi.git
-cd Yuxi
-
-# Linux/macOS
-./scripts/init.sh
-
-# Windows PowerShell
-.\scripts\init.ps1
+```mermaid
+flowchart LR
+  Vue["Vue 3: 会话/审批/工单/Trace"] --> API["FastAPI"]
+  API --> Worker["Chat Service / ARQ Worker"]
+  Worker --> Graph["LangGraph 企业 Workflow"]
+  Graph --> Tools["领域 Tools / 只读 KB Tools"]
+  Tools --> Service["业务 Service: 规则与权限"]
+  Service --> Repo["Tenant-scoped Repository"]
+  Repo --> DB[("PostgreSQL")]
+  Graph --> KB["Yuxi RAG / LightRAG"]
+  Graph --> HITL["ApprovalTask + interrupt/resume"]
+  Worker --> Trace["脱敏业务 Trace"]
 ```
 
-然后需要使用 docker 启动项目
+详细边界见 [企业架构](docs/enterprise/architecture.md) 与 [代码地图](ARCHITECTURE.md)。
 
+## 一次退款请求如何流转
+
+`classify -> extract_entities -> refund_order -> refund -> quality -> finalize`。意图与实体由模型理解，固定 Graph 决定业务节点顺序；`EnterpriseService` 仅接受与订单实付金额相等的整单退款，并校验订单状态、时间和风险。低风险退款自动通过；高风险退款创建 `ApprovalTask`、暂停 Graph，管理员审核后恢复原线程。最终回复必须与订单、退款和审批记录一致。详见 [Workflow](docs/enterprise/workflow.md)。
+
+## Agent Workflow 设计
+
+主流程是基于 LangGraph 的确定性企业 Agent Workflow：意图、实体、订单、退款、工单和质量检查按固定节点及条件边执行，并非多个独立 SubAgent 由 Supervisor 自由调度。只有 Knowledge 节点内部创建只读 Agent，调用 `list_kbs`、`query_kb`；退款操作不能由检索文本触发，业务分支固定经过 Quality Gate。详见 [工作流职责](docs/enterprise/multi-agent-design.md)。
+
+## Human-in-the-loop
+
+审批中心处理高风险退款的 approve/reject。任务保存线程和 Agent 配置，`resume_reviewed_approval()` 在审批提交后恢复 LangGraph checkpoint。审批已入库与恢复成功需分别核验。详见 [人工审批](docs/enterprise/human-in-the-loop.md)。
+
+## 幂等与权限
+
+登录账号 `User` 是企业内部客服/运营人员，不是消费者；`Customer` 是被服务消费者的业务档案，二者没有账号归属关系。`user` 为普通客服，`admin` 为客服主管/租户管理员，`superadmin` 为平台管理员。企业数据使用账号所属部门作为 `tenant_id`；普通客服可在本部门范围查订单、申请退款、创建工单，管理员还可审批及维护业务对象。这里没有“消费者只能查看本人订单”的授权能力，消费者自助门户属于未来工作。API、Service、Tool 共用动作矩阵。退款、工单和审批采用租户内幂等键、唯一约束与 savepoint 处理并发 replay。详见 [权限与租户](docs/enterprise/permission-and-tenant.md) 和 [幂等与错误](docs/enterprise/idempotency-and-errors.md)。
+
+## RAG 与 Grounding
+
+Knowledge Agent 仅能调用 `list_kbs`、`query_kb`。检索内容按不可信数据处理；确定性检查拦截与订单、退款或政策来源矛盾的回答，再进入模型质量检查。详见 [RAG 与 Grounding](docs/enterprise/rag-and-grounding.md)。
+
+## Evaluation
+
+`backend/eval/enterprise/datasets/customer_service_v1.jsonl` 有 50 条案例。Runner 执行真实 Graph，并输出逐例 JSON 与 Markdown。`--limit 5` 仅用于快速冒烟；完整评测使用 `--limit 50`。2026-10-11 在本地 Docker 与演示知识库上使用 `siliconflow-cn:deepseek-ai/DeepSeek-V4-Flash` 完成一次全量运行：**50/50 通过**，禁用 Tool 违规率 0，审批准确率 1，P50/P95 为 7603.78/26151.56 ms。四条产品题均回答了有来源的具体规格。该结果是单次 Demo 数据集实测，不代表生产准确率或长期稳定性；工具执行成功率 0.9178 包含预期的业务拒绝。完整[逐例报告](backend/eval/enterprise/reports/full_verified_2026-10-11/enterprise_eval_20261011T072956Z.md)与口径见[评测说明](docs/enterprise/evaluation.md)。
+
+## Trace / Observability
+
+脱敏业务 Trace 将输入、节点、Tool、审批恢复和最终状态关联到线程与租户；前端在会话面板和 `/enterprise/traces` 查看。已有 Langfuse 负责模型观测，业务 Trace 负责售后对象与决策过程。详见 [观测说明](docs/enterprise/observability.md)。
+
+## Demo
+
+```bash
+docker compose up --build -d
+docker ps
+docker exec api-dev uv run python scripts/seed_enterprise_demo.py
+docker exec api-dev uv run --no-sync python scripts/seed_enterprise_policy_kb.py --bind-agent
 ```
-docker compose up --build
+
+访问 [本地前端](http://localhost:5173)。演示账号种子仅供本地使用，生产环境必须关闭并更换凭证。政策、产品、物流、低额退款、高额批准/拒绝和注入隔离操作见 [Demo 指南](docs/enterprise/demo-guide.md)。演示知识库包含模拟资料并已索引；种子审批任务没有 Agent 线程关联，不能直接演示恢复。
+
+## 测试
+
+```bash
+docker exec api-dev uv run --group test pytest
+docker exec web-dev pnpm exec eslint . --cache
+docker exec web-dev pnpm run build
 ```
 
-等待启动完成后，访问 `http://localhost:5173`
+按 `docs/develop-guides/testing-guidelines.md` 区分单元、集成和 E2E。当前全量测试结果、历史失败和仍未消除的安全/部署风险见 [最终实施报告](docs/enterprise/final-implementation-report.md)。
 
-## 示例与演示
+## 本人二次开发内容
 
-<table>
-  <tr>
-    <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326125852369.png" width="100%" alt="首页"/>
-      <br/>
-      <strong>首页</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/d3e4fe09-fa48-4686-93ea-2c50300ade21" width="100%" alt="Dashboard 统计"/>
-      <br/>
-      <strong>Dashboard 统计</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326130528866.png" width="100%" alt="智能体配置"/>
-      <br/>
-      <strong>智能体配置</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/06d56525-69bf-463a-8360-286b2cf8796f" width="100%" alt="知识库调用"/>
-      <br/>
-      <strong>知识库调用</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/0548d89c-15a3-47cf-ba87-1b544f7dd749" width="100%" alt="新建知识库"/>
-      <br/>
-      <strong>新建知识库</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/21396d04-376b-4e9a-8139-eec8c3cc915a" width="100%" alt="知识库管理"/>
-      <br/>
-      <strong>知识库管理</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/fc46a14b-16fb-47ea-84a0-148a451f3012" width="100%" alt="知识图谱"/>
-      <br/>
-      <strong>知识图谱可视化</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/d8b3de51-2854-455b-956f-2ae2d8d5f677" width="100%" alt="项目文档"/>
-      <br/>
-      <strong>项目使用文档</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326130404306.png" width="100%" alt="拓展管理"/>
-      <br/>
-      <strong>拓展管理（Skills）</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/9305d7a4-663b-4e5d-a252-211d6caa019b" width="100%" alt="拓展管理（MCPs）"/>
-      <br/>
-      <strong>拓展管理（MCPs）</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/13bd22ea-ddde-4262-8c29-69fb948bce44" width="100%" alt="拓展管理（Skills）"/>
-      <br/>
-      <strong>用户/部门权限管理</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/cc886b04-719e-4abd-807d-e9955080003d" width="100%" alt="拓展管理（MCPs）"/>
-      <br/>
-      <strong>模型供应商配置</strong>
-    </td>
-  </tr>
-</table>
+企业 Customer/Product/Order/Refund/Ticket/ApprovalTask 领域模型；显式售后 Workflow 与领域 Tool；确定性退款政策和工单状态机；人工审批与原线程恢复；租户权限、并发幂等；企业 Agent 评测数据集与 Runner；脱敏业务 Trace；审批、工单与追踪页面。代码路径与验收证据见 [企业架构](docs/enterprise/architecture.md) 和 [最终实施报告](docs/enterprise/final-implementation-report.md)。[面试问答](docs/enterprise/interview-guide.md) 与 [简历描述](docs/enterprise/resume-description.md) 只陈述可核验能力。
 
+## 与上游 Yuxi 的关系
 
-
-## 致谢
-
-本项目参考并引用了以下优秀开源项目，在此致以诚挚的感谢：
-
-- [LightRAG](https://github.com/HKUDS/LightRAG) - 直接引入作为图谱构建与检索的基础包
-- [DeepAgents](https://github.com/IDEA-CCNL/DeepAgents) - 直接引入作为深度智能体框架
-- [DeerFlow](https://github.com/bytedance/deer-flow) - 参考了其 Sandbox 智能体架构的实现思路
-- [RAGflow](https://github.com/infiniflow/ragflow) - 参考了其文档 Text Chunking 的分块策略
-- [LangGraph](https://github.com/langchain-ai/langgraph) - 多智能体编排框架，本项目的核心架构基础
-
-## 参与贡献
-
-感谢所有贡献者的支持！
-
-<a href="https://github.com/xerrors/Yuxi/contributors">
-  <img src="https://contrib.rocks/image?repo=xerrors/Yuxi&max=100&columns=10" />
-</a>
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=xerrors/Yuxi)](https://star-history.com/#xerrors/Yuxi)
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
----
-
-<div align="center">
-
-**如果这个项目对您有帮助，请不要忘记给我们一个 ⭐️**
-
-</div>
+本项目是 [xerrors/Yuxi](https://github.com/xerrors/Yuxi) 的二次开发，保留上游归属与 [MIT License](LICENSE)。LangGraph 通用平台、RAG、知识图谱、MCP、Skills、Sandbox 及基础前后端来自上游；企业客服与售后模块是本仓库扩展。其他依赖和设计参考包括 [LightRAG](https://github.com/HKUDS/LightRAG)、[DeepAgents](https://github.com/IDEA-CCNL/DeepAgents)、[LangGraph](https://github.com/langchain-ai/langgraph) 和 [RAGFlow](https://github.com/infiniflow/ragflow)。不应把上游社区统计、历史贡献或通用能力误写成二开成果。

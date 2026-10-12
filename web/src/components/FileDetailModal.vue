@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useDatabaseStore } from '@/stores/database'
 import { useThemeStore } from '@/stores/theme'
 import { message } from 'ant-design-vue'
@@ -205,21 +205,6 @@ watch(file, (newFile, oldFile) => {
   }
 })
 
-watch(
-  [visible, file],
-  async ([open, currentFile]) => {
-    if (!open || !currentFile || !hasSourcePreview.value) {
-      if (!open || !hasSourcePreview.value) {
-        revokeSourcePreviewUrl()
-      }
-      return
-    }
-
-    await loadSourcePreview()
-  },
-  { immediate: true }
-)
-
 // 统计信息
 const mergeResult = computed(() => mergeChunks(file.value?.lines || []))
 const mappedChunks = computed(() => mergeResult.value.chunks)
@@ -246,6 +231,8 @@ const afterOpenChange = (open) => {
   }
 }
 
+let disposed = false
+
 const loadSourcePreview = async () => {
   if (!file.value?.file_id || !store.databaseId || !hasSourcePreview.value) return
   if (sourcePreviewUrl.value) return
@@ -254,6 +241,7 @@ const loadSourcePreview = async () => {
   try {
     const response = await documentApi.downloadDocument(store.databaseId, file.value.file_id)
     const blob = await response.blob()
+    if (disposed || !visible.value) return
     revokeSourcePreviewUrl()
     sourcePreviewUrl.value = window.URL.createObjectURL(blob)
   } catch (error) {
@@ -263,6 +251,26 @@ const loadSourcePreview = async () => {
     sourcePreviewLoading.value = false
   }
 }
+
+watch(
+  [visible, file],
+  async ([open, currentFile]) => {
+    if (!open || !currentFile || !hasSourcePreview.value) {
+      if (!open || !hasSourcePreview.value) {
+        revokeSourcePreviewUrl()
+      }
+      return
+    }
+
+    await loadSourcePreview()
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  disposed = true
+  revokeSourcePreviewUrl()
+})
 
 // 下载菜单点击处理
 const handleDownloadMenuClick = ({ key }) => {

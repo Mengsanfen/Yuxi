@@ -33,6 +33,31 @@ class BaseContext:
         metadata={"name": "用户ID", "configurable": False, "description": "用来唯一标识一个用户"},
     )
 
+    account_user_id: str | None = field(
+        default=None,
+        metadata={"name": "登录账号ID", "configurable": False, "description": "知识库权限查询使用的账号标识"},
+    )
+
+    tenant_id: int | None = field(
+        default=None,
+        metadata={"name": "租户ID", "configurable": False, "description": "当前用户所属部门租户"},
+    )
+
+    user_role: str = field(
+        default="user",
+        metadata={"name": "用户角色", "configurable": False, "description": "当前登录用户角色"},
+    )
+
+    agent_id: str | None = field(
+        default=None,
+        metadata={"name": "智能体ID", "configurable": False, "description": "当前运行的智能体ID"},
+    )
+
+    agent_config_id: int | None = field(
+        default=None,
+        metadata={"name": "智能体配置ID", "configurable": False, "description": "当前运行的智能体配置ID"},
+    )
+
     system_prompt: Annotated[str, {"__template_metadata__": {"kind": "prompt"}}] = field(
         default="You are a helpful assistant.",
         metadata={"name": "系统提示词", "description": "用来描述智能体的角色和行为"},

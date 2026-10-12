@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from yuxi.agents.toolkits.kbs import tools
+from yuxi.services.enterprise_trace_timing import active_tool_timings
 
 
 def _query_kb_callable():
@@ -26,6 +27,62 @@ async def _run_query_kb(**kwargs):
     if inspect.isawaitable(result):
         return await result
     return result
+
+
+@pytest.mark.asyncio
+async def test_list_kbs_uses_string_user_id_and_enabled_names(monkeypatch) -> None:
+    async def _fake_get_databases_by_user_id(user_id: str):
+        assert user_id == "admin"
+        return {"databases": [{"name": "FAQ", "description": "Public policy"}, {"name": "Secret"}]}
+
+    monkeypatch.setattr(tools.knowledge_base, "get_databases_by_user_id", _fake_get_databases_by_user_id)
+    runtime = SimpleNamespace(context=SimpleNamespace(user_id="admin", knowledges=["FAQ"]))
+
+    result = await tools.list_kbs.coroutine(dummy="", runtime=runtime)
+
+    assert result == [{"name": "FAQ", "description": "Public policy"}]
+
+
+@pytest.mark.asyncio
+async def test_list_kbs_uses_account_id_when_runtime_user_id_is_numeric(monkeypatch) -> None:
+    async def _fake_get_databases_by_user_id(user_id: str):
+        assert user_id == "admin"
+        return {"databases": [{"name": "Enterprise Demo", "description": "Demo"}]}
+
+    monkeypatch.setattr(tools.knowledge_base, "get_databases_by_user_id", _fake_get_databases_by_user_id)
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(user_id="1", account_user_id="admin", knowledges=["Enterprise Demo"])
+    )
+
+    result = await tools.list_kbs.coroutine(dummy="", runtime=runtime)
+
+    assert result == [{"name": "Enterprise Demo", "description": "Demo"}]
+
+
+@pytest.mark.asyncio
+async def test_query_kb_denies_global_retriever_when_session_has_no_visible_kbs(monkeypatch) -> None:
+    called = False
+
+    async def _fake_retriever(query_text: str, **kwargs):
+        nonlocal called
+        called = True
+        return "foreign tenant secret"
+
+    monkeypatch.setattr(
+        tools.knowledge_base,
+        "get_retrievers",
+        lambda: {"foreign-db": {"name": "Foreign", "retriever": _fake_retriever}},
+    )
+    monkeypatch.setattr(tools, "_resolve_visible_knowledge_bases_for_query", lambda runtime: _empty_visible())
+
+    result = await _run_query_kb(kb_name="Foreign", query_text="secret", runtime=SimpleNamespace())
+
+    assert "不存在或当前会话未启用" in result
+    assert called is False
+
+
+async def _empty_visible():
+    return []
 
 
 @pytest.mark.asyncio
@@ -72,10 +129,18 @@ async def test_query_kb_injects_filepath_into_chunk_metadata(monkeypatch) -> Non
     )
 
     runtime = SimpleNamespace(context=SimpleNamespace())
-    result = await _run_query_kb(kb_name="FAQ", query_text="auth", runtime=runtime)
+    timings = []
+    token = active_tool_timings.set(timings)
+    try:
+        result = await _run_query_kb(kb_name="FAQ", query_text="auth", runtime=runtime)
+    finally:
+        active_tool_timings.reset(token)
 
     assert result[0]["metadata"]["filepath"] == "/home/gem/kbs/FAQ/API/auth-guide.pdf"
     assert result[0]["metadata"]["parsed_path"] == "/home/gem/kbs/FAQ/parsed/API/auth-guide.pdf.md"
+    assert timings[0]["tool_name"] == "query_kb"
+    assert timings[0]["retrieval"] is True
+    assert timings[0]["duration_ms"] >= 0
 
 
 @pytest.mark.asyncio

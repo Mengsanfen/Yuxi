@@ -152,6 +152,7 @@
                 :mention="mentionConfig"
                 :supports-file-upload="supportsFileUpload"
                 :is-panel-open="isAgentPanelOpen"
+                :panel-type="isEnterpriseAgent ? 'enterprise' : 'files'"
                 :has-active-thread="!!currentChatId"
                 :todos="currentTodos"
                 @send="handleSendOrStop"
@@ -201,8 +202,19 @@
             flexBasis: isAgentPanelOpen ? `${panelRatio * 100}%` : '0px'
           }"
         >
+          <EnterpriseRunPanel
+            v-if="isAgentPanelOpen && isEnterpriseAgent"
+            :agent-state="currentAgentState"
+            :thread-id="currentChatId"
+            :is-expanded="isAgentPanelExpanded"
+            @refresh="handleAgentStateRefresh"
+            @close="toggleAgentPanel"
+            @toggle-expand="togglePanelExpanded"
+            @resize="handlePanelResize"
+            @resizing="handleResizingChange"
+          />
           <AgentPanel
-            v-if="isAgentPanelOpen"
+            v-else-if="isAgentPanelOpen"
             :agent-state="currentAgentState"
             :thread-files="currentThreadFiles"
             :thread-id="currentChatId"
@@ -237,6 +249,7 @@ import {
 } from 'vue'
 import { message } from 'ant-design-vue'
 import AgentInputArea from '@/components/AgentInputArea.vue'
+import EnterpriseRunPanel from '@/components/enterprise/EnterpriseRunPanel.vue'
 import AgentMessageComponent from '@/components/AgentMessageComponent.vue'
 import RefsComponent from '@/components/RefsComponent.vue'
 import ToolCallsGroupComponent from '@/components/ToolCallsGroupComponent.vue'
@@ -404,6 +417,9 @@ const currentThreadAgentName = computed(() => {
   return currentAgentName.value
 })
 const currentAgentIcon = computed(() => getAgentIconComponent(currentAgentId.value))
+const isEnterpriseAgent = computed(
+  () => (currentThread.value?.agent_id || currentAgentId.value) === 'EnterpriseServiceAgent'
+)
 
 // 检查当前智能体是否支持文件上传
 const supportsFileUpload = computed(() => {
@@ -440,6 +456,9 @@ const currentTodos = computed(() => {
 })
 
 const hasAgentStateContent = computed(() => {
+  if (isEnterpriseAgent.value) {
+    return Boolean(currentAgentState.value?.intent)
+  }
   return shouldAutoOpenAgentPanel(currentThreadFiles.value)
 })
 
@@ -2354,6 +2373,34 @@ watch(currentChatId, (threadId, oldThreadId) => {
 }
 
 @media (max-width: 768px) {
+  .chat-content-container {
+    contain: none;
+  }
+
+  .agent-panel-wrapper,
+  .agent-panel-wrapper.is-expanded {
+    position: fixed;
+    z-index: 1100;
+    inset: 8px 8px auto 64px;
+    width: auto;
+    height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+    margin: 0;
+    border-radius: 8px;
+    pointer-events: none;
+    transform: translateX(calc(100% + 16px));
+
+    :deep(.resize-handle) {
+      display: none;
+    }
+  }
+
+  .agent-panel-wrapper.is-visible {
+    margin: 0;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
   .agent-segment-wrapper {
     margin-bottom: 8px;
 

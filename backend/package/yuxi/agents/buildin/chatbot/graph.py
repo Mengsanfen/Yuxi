@@ -64,7 +64,7 @@ async def _build_middlewares(context):
 
 class ChatbotAgent(BaseAgent):
     name = "智能助手"
-    description = "基础的对话机器人，可以回答问题，可在配置中启用需要的工具。"
+    description = "面向知识检索、图谱推理和任务执行的交互式智能体助手。"
     capabilities = ["file_upload", "files"]  # 支持文件上传功能
     metadata = {
         "examples": [

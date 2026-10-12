@@ -30,6 +30,8 @@ x-api-worker-env: &api-worker-env
   # Agent run
   RUN_CANCEL_KEY_TTL_SECONDS: ${RUN_CANCEL_KEY_TTL_SECONDS:-1800}
   RUN_EVENTS_STREAM_TTL_SECONDS: ${RUN_EVENTS_STREAM_TTL_SECONDS:-7200}
+  YUXI_SEED_DEFAULT_ACCOUNTS: ${YUXI_SEED_DEFAULT_ACCOUNTS:-true}
+  YUXI_DEFAULT_ACCOUNT_PASSWORD: ${YUXI_DEFAULT_ACCOUNT_PASSWORD:-NexaMind@2026}
   # 其他环境变量
   NO_PROXY: localhost,127.0.0.1,milvus,graph,minio,milvus-etcd-dev,etcd,mineru,paddlex,sandbox-provisioner,api.siliconflow.cn
   no_proxy: localhost,127.0.0.1,milvus,graph,minio,milvus-etcd-dev,etcd,mineru,paddlex,sandbox-provisioner,api.siliconflow.cn
@@ -48,6 +50,7 @@ services:
       - ./saves:/app/saves
       - ./backend/test:/app/test
       - ./backend/scripts:/app/scripts
+      - ./backend/eval:/app/eval
       - ./docker/sandbox_provisioner:/app/docker/sandbox_provisioner:ro
       - ./.env:/app/.env
       - ${MODEL_DIR:-./models}:/models  # 使用默认值处理未定义的环境变量
@@ -68,7 +71,7 @@ services:
     command: uv run --no-dev uvicorn server.main:app --host 0.0.0.0 --port 5050 --reload --reload-dir /app/server --reload-dir /app/package
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5050/api/system/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5050/api/system/ready || exit 1"]
       interval: 30s
       timeout: 15s
       retries: 8
@@ -96,6 +99,7 @@ services:
       - ./saves:/app/saves
       - ./backend/test:/app/test
       - ./backend/scripts:/app/scripts
+      - ./backend/eval:/app/eval
       - ./docker/sandbox_provisioner:/app/docker/sandbox_provisioner:ro
       - ./.env:/app/.env
       - ./backend/pyproject.toml:/app/pyproject.toml

@@ -25,9 +25,19 @@ if str(PROJECT_ROOT) not in sys.path:
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 load_dotenv(PROJECT_ROOT / "test/.env.test", override=False)
 
+from yuxi.services.identity_seed_service import DEFAULT_SEED_PASSWORD, DEFAULT_USERS  # noqa: E402
+
 API_BASE_URL = os.getenv("TEST_BASE_URL", "http://localhost:5050").rstrip("/")
-ADMIN_LOGIN = os.getenv("TEST_USERNAME")
-ADMIN_PASSWORD = os.getenv("TEST_PASSWORD")
+DEFAULT_DEMO_ACCOUNTS_FLAG = "true" if os.getenv("RUNNING_IN_DOCKER") == "true" else "false"
+DEMO_ACCOUNTS_ENABLED = os.getenv("YUXI_SEED_DEFAULT_ACCOUNTS", DEFAULT_DEMO_ACCOUNTS_FLAG).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+DEMO_SUPERADMIN = next(item for item in DEFAULT_USERS if item.role == "superadmin")
+ADMIN_LOGIN = os.getenv("TEST_USERNAME") or (DEMO_SUPERADMIN.user_id if DEMO_ACCOUNTS_ENABLED else None)
+ADMIN_PASSWORD = os.getenv("TEST_PASSWORD") or (DEFAULT_SEED_PASSWORD if DEMO_ACCOUNTS_ENABLED else None)
 
 _ADMIN_TOKEN_CACHE: str | None = None
 HTTP_TIMEOUT = httpx.Timeout(60.0, connect=5.0)

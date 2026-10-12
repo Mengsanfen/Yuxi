@@ -154,6 +154,19 @@ async def test_process_agent_run_retryable_error_retries_then_completes(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_run_event_publish_failure_does_not_raise(monkeypatch: pytest.MonkeyPatch):
+    async def fail_to_publish(run_id: str, event_type: str, payload: dict):
+        del run_id, event_type, payload
+        raise RuntimeError("temporary redis persistence error")
+
+    monkeypatch.setattr(run_worker, "append_run_stream_event", fail_to_publish)
+
+    published = await run_worker.append_run_event("run-1", "loading", {"chunk": {}})
+
+    assert published is False
+
+
+@pytest.mark.asyncio
 async def test_worker_startup_ensures_builtin_mcp_servers(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
 

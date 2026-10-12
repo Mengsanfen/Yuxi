@@ -20,6 +20,7 @@ from yuxi.services.langfuse_service import (
     flush_langfuse,
     get_trace_info,
 )
+from yuxi.services.enterprise_trace_service import EnterpriseTraceRecorder
 from yuxi.storage.postgres.manager import pg_manager
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.logging_config import logger
@@ -115,6 +116,30 @@ def extract_agent_state(values: dict) -> AgentStatePayload:
         "artifacts": list(artifacts) if artifacts else [],
     }
 
+    enterprise_fields = (
+        "intent",
+        "domain",
+        "action",
+        "ticket_type",
+        "security_signals",
+        "intent_confidence",
+        "risk_level",
+        "order_no",
+        "customer_id",
+        "refund_amount",
+        "ticket_id",
+        "order_context",
+        "knowledge_result",
+        "refund_result",
+        "ticket_result",
+        "approval_result",
+        "quality_result",
+        "repair_count",
+    )
+    for field_name in enterprise_fields:
+        if field_name in values:
+            result[field_name] = values[field_name]
+
     return result
 
 
@@ -125,6 +150,15 @@ def _agent_state_signature(agent_state: AgentStatePayload | dict | None) -> str:
         return json.dumps(agent_state, ensure_ascii=False, sort_keys=True)
     except Exception:
         return str(agent_state)
+
+
+def _message_to_json_dict(message) -> dict:
+    if not hasattr(message, "model_dump"):
+        return {}
+    try:
+        return message.model_dump(mode="json")
+    except TypeError:
+        return message.model_dump()
 
 
 async def _stream_agent_events(agent, messages, *, input_context=None, **kwargs):
@@ -215,7 +249,7 @@ async def save_partial_message(
             "error_message": error_message or f"发生错误: {error_type}",
         }
         if full_msg:
-            msg_dict = full_msg.model_dump() if hasattr(full_msg, "model_dump") else {}
+            msg_dict = _message_to_json_dict(full_msg)
             content = full_msg.content if hasattr(full_msg, "content") else str(full_msg)
             extra_metadata = msg_dict | extra_metadata
         else:
@@ -252,7 +286,7 @@ async def save_messages_from_langgraph_state(
     existing_ids = await _get_existing_message_ids(conv_repo, thread_id)
 
     for msg in messages:
-        msg_dict = msg.model_dump() if hasattr(msg, "model_dump") else {}
+        msg_dict = _message_to_json_dict(msg)
         msg_type = msg_dict.get("type", "unknown")
 
         if msg_type == "human" or getattr(msg, "id", None) in existing_ids:
@@ -348,11 +382,15 @@ def _build_ask_user_question_payload(info: Any, thread_id: str) -> dict[str, Any
 
     source = str(payload.get("source") or payload.get("tool_name") or "interrupt")
 
-    return {
+    result = {
         "questions": questions,
         "source": source,
         "thread_id": thread_id,
     }
+    for key in ("approval_task_id", "business_type", "business_id", "risk_level", "amount"):
+        if payload.get(key) is not None:
+            result[key] = payload[key]
+    return result
 
 
 def _ensure_full_msg(full_msg: AIMessage | None, accumulated_content: list[str]) -> AIMessage | None:
@@ -371,7 +409,7 @@ def _extract_ai_message(messages: list[Any] | None) -> AIMessage | None:
         if isinstance(msg, AIMessage):
             return msg
 
-        msg_dict = msg.model_dump() if hasattr(msg, "model_dump") else {}
+        msg_dict = _message_to_json_dict(msg)
         if msg_dict.get("type") == "ai":
             content = msg_dict.get("content", "")
             return msg if hasattr(msg, "content") else AIMessage(content=content)
@@ -410,6 +448,24 @@ async def _resolve_agent_config(db, agent_id: str, user: User, agent_config_id):
     return (config_item.config_json or {}).get("context", {})
 
 
+def _build_runtime_identity_context(
+    *,
+    current_user: User,
+    agent_id: str,
+    agent_config_id: int | None,
+    thread_id: str,
+) -> dict[str, Any]:
+    return {
+        "user_id": str(current_user.id),
+        "account_user_id": current_user.user_id,
+        "tenant_id": current_user.department_id,
+        "user_role": getattr(current_user, "role", "user"),
+        "agent_id": agent_id,
+        "agent_config_id": agent_config_id,
+        "thread_id": thread_id,
+    }
+
+
 async def check_and_handle_interrupts(
     agent,
     langgraph_config: dict,
@@ -428,7 +484,12 @@ async def check_and_handle_interrupts(
         if interrupt_info:
             question_payload = _build_ask_user_question_payload(interrupt_info, thread_id)
             meta["interrupt"] = question_payload
-            yield make_chunk(status="ask_user_question_required", meta=meta, **question_payload)
+            interrupt_status = (
+                "human_approval_required"
+                if question_payload.get("source") == "enterprise_refund_approval"
+                else "ask_user_question_required"
+            )
+            yield make_chunk(status=interrupt_status, meta=meta, **question_payload)
 
     except Exception as e:
         logger.error(f"Error checking interrupts: {e}")
@@ -559,8 +620,29 @@ async def agent_chat(
     if not thread_id:
         thread_id = str(uuid.uuid4())
         logger.warning(f"No thread_id provided, generated new thread_id: {thread_id}")
+    meta["thread_id"] = thread_id
 
-    input_context = agent_config | {"user_id": user_id, "thread_id": thread_id}
+    trace_recorder = None
+    if agent_id == "EnterpriseServiceAgent":
+        trace_recorder = EnterpriseTraceRecorder(
+            trace_id=meta["request_id"],
+            thread_id=thread_id,
+            tenant_id=int(current_user.department_id),
+            user_id=user_id,
+            agent_name=agent_id,
+        )
+        await trace_recorder.start(
+            model=agent_config.get("model"),
+            has_image=bool(image_content),
+            agent_config_id=agent_config_id,
+        )
+
+    input_context = agent_config | _build_runtime_identity_context(
+        current_user=current_user,
+        agent_id=agent_id,
+        agent_config_id=agent_config_id,
+        thread_id=thread_id,
+    )
     langfuse_run = _build_langfuse_run_context(
         current_user=current_user,
         thread_id=thread_id,
@@ -629,6 +711,8 @@ async def agent_chat(
                 "content_guard_blocked",
                 trace_info=trace_info,
             )
+            if trace_recorder:
+                await trace_recorder.finish("interrupted", {"reason": "content_guard_blocked"})
             return {
                 "status": "interrupted",
                 "message": "检测到敏感内容，已中断输出",
@@ -654,12 +738,18 @@ async def agent_chat(
         except Exception as e:
             logger.error(f"Error saving messages from LangGraph state: {e}")
             logger.error(traceback.format_exc())
+            if trace_recorder:
+                await trace_recorder.finish("failed", {"error_type": "save_message_error"})
             return {
                 "status": "error",
                 "error_type": "save_message_error",
                 "error_message": f"消息保存失败: {e}",
                 "request_id": meta.get("request_id"),
             }
+
+        if trace_recorder:
+            await trace_recorder.record_graph_update({"finalize": invoke_result})
+            await trace_recorder.finish("completed")
 
         return {
             "status": "finished",
@@ -672,6 +762,8 @@ async def agent_chat(
 
     except Exception as e:
         logger.error(f"Error in agent_chat: {e}, {traceback.format_exc()}")
+        if trace_recorder:
+            await trace_recorder.finish("failed", {"error_type": "unexpected_error"})
         return {
             "status": "error",
             "error_type": "unexpected_error",
@@ -775,8 +867,30 @@ async def stream_agent_chat(
     if not thread_id:
         thread_id = str(uuid.uuid4())
         logger.warning(f"No thread_id provided, generated new thread_id: {thread_id}")
+    meta["thread_id"] = thread_id
 
-    input_context = agent_config | {"user_id": user_id, "thread_id": thread_id}
+    trace_recorder = None
+    if agent_id == "EnterpriseServiceAgent":
+        trace_recorder = EnterpriseTraceRecorder(
+            trace_id=str(meta.get("run_id") or meta["request_id"]),
+            thread_id=thread_id,
+            tenant_id=int(current_user.department_id),
+            user_id=user_id,
+            run_id=str(meta["run_id"]) if meta.get("run_id") else None,
+            agent_name=agent_id,
+        )
+        await trace_recorder.start(
+            model=agent_config.get("model"),
+            has_image=bool(image_content),
+            agent_config_id=agent_config_id,
+        )
+
+    input_context = agent_config | _build_runtime_identity_context(
+        current_user=current_user,
+        agent_id=agent_id,
+        agent_config_id=agent_config_id,
+        thread_id=thread_id,
+    )
     langfuse_run = _build_langfuse_run_context(
         current_user=current_user,
         thread_id=thread_id,
@@ -835,6 +949,11 @@ async def stream_agent_chat(
             metadata=langfuse_run.metadata,
             tags=langfuse_run.tags,
         ):
+            if mode == "updates":
+                if trace_recorder:
+                    await trace_recorder.record_graph_update(payload)
+                continue
+
             if mode == "values":
                 agent_state = extract_agent_state(payload if isinstance(payload, dict) else {})
                 signature = _agent_state_signature(agent_state)
@@ -858,13 +977,20 @@ async def stream_agent_chat(
                         "content_guard_blocked",
                         trace_info=trace_info,
                     )
+                    if trace_recorder:
+                        await trace_recorder.finish("interrupted", {"reason": "content_guard_blocked"})
                     meta["time_cost"] = asyncio.get_event_loop().time() - start_time
                     yield make_chunk(status="interrupted", message="检测到敏感内容，已中断输出", meta=meta)
                     return
 
-                yield make_chunk(content=msg.content, msg=msg.model_dump(), metadata=metadata, status="loading")
+                yield make_chunk(
+                    content=msg.content,
+                    msg=_message_to_json_dict(msg),
+                    metadata=metadata,
+                    status="loading",
+                )
             else:
-                msg_dict = msg.model_dump()
+                msg_dict = _message_to_json_dict(msg)
                 trace_info = get_trace_info(langfuse_run)
                 yield make_chunk(msg=msg_dict, metadata=metadata, status="loading")
 
@@ -879,6 +1005,8 @@ async def stream_agent_chat(
                 "content_guard_blocked",
                 trace_info=trace_info,
             )
+            if trace_recorder:
+                await trace_recorder.finish("interrupted", {"reason": "content_guard_blocked"})
             meta["time_cost"] = asyncio.get_event_loop().time() - start_time
             yield make_chunk(status="interrupted", message="检测到敏感内容，已中断输出", meta=meta)
             return
@@ -913,10 +1041,15 @@ async def stream_agent_chat(
             logger.error(traceback.format_exc())
             yield make_chunk(status="warning", message=f"消息保存失败: {e}", meta=meta)
 
+        if trace_recorder:
+            trace_status = "interrupted" if meta.get("interrupt") else "completed"
+            await trace_recorder.finish(trace_status)
         yield make_chunk(status="finished", meta=meta)
 
     except (asyncio.CancelledError, ConnectionError) as e:
         logger.warning(f"Client disconnected, cancelling stream: {e}")
+        if trace_recorder:
+            await trace_recorder.finish("interrupted", {"reason": "client_disconnected"})
 
         async def save_cleanup():
             nonlocal full_msg
@@ -945,6 +1078,8 @@ async def stream_agent_chat(
 
     except Exception as e:
         logger.error(f"Error streaming messages: {e}, {traceback.format_exc()}")
+        if trace_recorder:
+            await trace_recorder.finish("failed", {"error_type": "unexpected_error"})
 
         error_msg = f"Error streaming messages: {e}"
         error_type = "unexpected_error"
@@ -1012,7 +1147,14 @@ async def stream_agent_resume(
 
     context = agent.context_schema()
     context.update(agent_config or {})
-    context.update({"user_id": user_id, "thread_id": thread_id})
+    context.update(
+        _build_runtime_identity_context(
+            current_user=current_user,
+            agent_id=agent_id,
+            agent_config_id=agent_config_id,
+            thread_id=thread_id,
+        )
+    )
     graph = await agent.get_graph(context=context)
     langfuse_run = _build_langfuse_run_context(
         current_user=current_user,
@@ -1025,6 +1167,21 @@ async def stream_agent_resume(
     )
     trace_info: dict[str, Any] = {}
     last_agent_state_signature = ""
+    trace_recorder = None
+    if agent_id == "EnterpriseServiceAgent":
+        trace_recorder = await EnterpriseTraceRecorder.for_resume(
+            thread_id=thread_id,
+            tenant_id=int(current_user.department_id),
+            user_id=user_id,
+            fallback_trace_id=str(meta.get("request_id") or uuid.uuid4()),
+            agent_name=agent_id,
+        )
+        await trace_recorder.record_resume(
+            {
+                "approval_task_id": meta.get("approval_task_id"),
+                "review_decision": meta.get("review_decision"),
+            }
+        )
 
     stream_source = graph.astream(
         resume_command,
@@ -1035,11 +1192,16 @@ async def stream_agent_resume(
             "metadata": langfuse_run.metadata,
             "tags": langfuse_run.tags,
         },
-        stream_mode=["messages", "values"],
+        stream_mode=["messages", "values", "updates"],
     )
 
     try:
         async for mode, payload in stream_source:
+            if mode == "updates":
+                if trace_recorder:
+                    await trace_recorder.record_graph_update(payload)
+                continue
+
             if mode == "values":
                 agent_state = extract_agent_state(payload if isinstance(payload, dict) else {})
                 signature = _agent_state_signature(agent_state)
@@ -1050,7 +1212,7 @@ async def stream_agent_resume(
 
             msg, metadata = payload
             trace_info = get_trace_info(langfuse_run)
-            msg_dict = msg.model_dump()
+            msg_dict = _message_to_json_dict(msg)
             if "id" not in msg_dict:
                 msg_dict["id"] = str(uuid.uuid4())
 
@@ -1089,10 +1251,15 @@ async def stream_agent_resume(
             logger.error(traceback.format_exc())
             yield make_resume_chunk(status="warning", message=f"消息保存失败: {e}", meta=meta)
 
+        if trace_recorder:
+            trace_status = "interrupted" if meta.get("interrupt") else "completed"
+            await trace_recorder.finish(trace_status, {"phase": "resume"})
         yield make_resume_chunk(status="finished", meta=meta)
 
     except (asyncio.CancelledError, ConnectionError) as e:
         logger.warning(f"Client disconnected during resume: {e}")
+        if trace_recorder:
+            await trace_recorder.finish("interrupted", {"phase": "resume"})
 
         async with pg_manager.get_async_session_context() as new_db:
             new_conv_repo = ConversationRepository(new_db)
@@ -1108,6 +1275,8 @@ async def stream_agent_resume(
 
     except Exception as e:
         logger.error(f"Error during resume: {e}, {traceback.format_exc()}")
+        if trace_recorder:
+            await trace_recorder.finish("failed", {"phase": "resume", "error_type": "resume_error"})
 
         async with pg_manager.get_async_session_context() as new_db:
             new_conv_repo = ConversationRepository(new_db)

@@ -194,6 +194,10 @@ class PostgresManager(metaclass=SingletonMeta):
             "ALTER TABLE IF EXISTS subagents ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE IF EXISTS conversations ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE IF EXISTS mcp_servers ADD COLUMN IF NOT EXISTS env JSONB",
+            "ALTER TABLE IF EXISTS approval_tasks ADD COLUMN IF NOT EXISTS thread_id VARCHAR(64)",
+            "ALTER TABLE IF EXISTS approval_tasks ADD COLUMN IF NOT EXISTS agent_id VARCHAR(64)",
+            "ALTER TABLE IF EXISTS approval_tasks ADD COLUMN IF NOT EXISTS agent_config_id INTEGER",
+            "CREATE INDEX IF NOT EXISTS ix_approval_tasks_thread_id ON approval_tasks(thread_id)",
             """
             CREATE TABLE IF NOT EXISTS model_providers (
                 id SERIAL PRIMARY KEY,
@@ -242,6 +246,8 @@ class PostgresManager(metaclass=SingletonMeta):
             "CREATE INDEX IF NOT EXISTS idx_agent_runs_thread_created ON agent_runs(thread_id, created_at DESC)",
             "CREATE INDEX IF NOT EXISTS idx_agent_runs_status_updated ON agent_runs(status, updated_at)",
             "CREATE INDEX IF NOT EXISTS ix_conversations_is_pinned ON conversations(is_pinned)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_refunds_tenant_order_active "
+            "ON refunds(tenant_id, order_id) WHERE status <> 'REJECTED'",
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_model_providers_provider_id ON model_providers(provider_id)",
             "CREATE INDEX IF NOT EXISTS ix_model_providers_is_enabled ON model_providers(is_enabled)",
         ]

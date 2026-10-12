@@ -5,8 +5,8 @@ import markdownItTaskCheckbox from 'markdown-it-task-checkbox'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   lang: 'zh-CN',
-  title: "Yuxi",
-  description: "语析",
+  title: "NexaMind Enterprise",
+  description: "基于 Yuxi 二次开发的企业客服与售后自动化平台",
   base: '/Yuxi/',
   ignoreDeadLinks: [
     /localhost/,
@@ -24,7 +24,8 @@ export default defineConfig({
     logo: "/favicon.svg",
     nav: [
       { text: '快速开始', link: '/intro/quick-start' },
-      { text: '智能体开发', link: '/agents/agents-config' }
+      { text: '智能体开发', link: '/agents/agents-config' },
+      { text: '企业客服', link: '/enterprise/architecture' }
     ],
 
     sidebar: [
@@ -49,6 +50,27 @@ export default defineConfig({
           { text: 'MCP 集成', link: '/agents/mcp-integration' },
           { text: 'Skills 管理', link: '/agents/skills-management' },
           { text: 'SubAgents 管理', link: '/agents/subagents-management' }
+        ]
+      },
+      {
+        text: '企业客服二次开发',
+        items: [
+          { text: '架构', link: '/enterprise/architecture' },
+          { text: '售后 Workflow', link: '/enterprise/workflow' },
+          { text: '多智能体设计', link: '/enterprise/multi-agent-design' },
+          { text: 'RAG 与 Grounding', link: '/enterprise/rag-and-grounding' },
+          { text: 'MCP 与领域 Tools', link: '/enterprise/mcp-and-tools' },
+          { text: '人工审批', link: '/enterprise/human-in-the-loop' },
+          { text: '权限与租户', link: '/enterprise/permission-and-tenant' },
+          { text: '幂等与错误', link: '/enterprise/idempotency-and-errors' },
+          { text: '企业评测', link: '/enterprise/evaluation' },
+          { text: '业务 Trace', link: '/enterprise/observability' },
+          { text: '安全与部署风险', link: '/enterprise/security' },
+          { text: 'Demo 指南', link: '/enterprise/demo-guide' },
+          { text: '项目学习与面试教程', link: '/enterprise/learning-and-interview-tutorial' },
+          { text: '面试问答', link: '/enterprise/interview-guide' },
+          { text: '简历描述', link: '/enterprise/resume-description' },
+          { text: '最终实施报告', link: '/enterprise/final-implementation-report' }
         ]
       },
       {
@@ -79,13 +101,8 @@ export default defineConfig({
     ],
 
     footer: {
-      message: '本项目基于 MIT License 开源，欢迎使用和贡献。',
-      copyright: 'Copyright © 2025-present Yuxi'
-    },
-
-    editLink: {
-      pattern: 'https://github.com/xerrors/Yuxi/edit/main/docs/:path',
-      text: '在 GitHub 上编辑此页'
+      message: 'NexaMind Enterprise 基于 Yuxi 二次开发，遵循 MIT License。',
+      copyright: 'Copyright © 2025-present Yuxi contributors and NexaMind Enterprise contributors'
     },
 
     lastUpdated: {

@@ -151,7 +151,14 @@ async def test_add_documents_auto_index_uses_latest_parsed_metadata(monkeypatch:
         ) -> None:
             calls.append(("update_params", file_id))
 
-        async def index_file(self, _db_id: str, file_id: str, operator_id: str | None = None) -> dict:
+        async def index_file(
+            self,
+            _db_id: str,
+            file_id: str,
+            operator_id: str | None = None,
+            params: dict | None = None,
+        ) -> dict:
+            assert params is not None
             calls.append(("index", file_id))
             return {"file_id": file_id, "status": FileStatus.INDEXED, "operator_id": operator_id}
 

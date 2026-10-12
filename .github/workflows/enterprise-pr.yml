@@ -1,0 +1,88 @@
+name: Enterprise PR Checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Frontend lint
+        run: pnpm exec eslint . --no-cache
+      - name: Frontend build
+        run: pnpm build
+
+  enterprise-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare Compose environment
+        run: touch .env
+      - name: Start integration services
+        run: docker compose up -d --build api worker graph milvus
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose exec -T api curl -fsS http://localhost:5050/api/system/ready; then exit 0; fi
+            sleep 10
+          done
+          docker compose logs --tail=100 api
+          exit 1
+      - name: Ruff
+        run: docker compose exec -T api uv run ruff check package server/routers/enterprise_router.py test/unit/agents test/unit/evaluation test/unit/services/test_enterprise_approval_runtime.py test/unit/services/test_enterprise_trace_service.py
+      - name: Enterprise unit tests and offline Graph Eval smoke
+        run: docker compose exec -T api uv run pytest test/unit/agents test/unit/evaluation test/unit/services/test_enterprise_approval_runtime.py test/unit/services/test_enterprise_trace_service.py test/unit/services/test_enterprise_service.py test/unit/toolkits/test_enterprise_refund_tool.py -q
+      - name: Enterprise integration tests
+        run: docker compose exec -T api uv run pytest test/integration/api/test_enterprise_router.py test/integration/api/test_enterprise_approval_concurrency.py test/integration/api/test_enterprise_trace_router.py test/integration/services/test_enterprise_approval_recovery.py -q
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail=100 api worker postgres graph milvus
+      - name: Stop integration services
+        if: always()
+        run: docker compose down
+
+  live-eval-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SILICONFLOW_API_KEY: ${{ secrets.SILICONFLOW_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require model credential
+        run: test -n "$SILICONFLOW_API_KEY"
+      - name: Prepare Compose environment
+        run: printf 'SILICONFLOW_API_KEY=%s\n' "$SILICONFLOW_API_KEY" > .env
+      - run: docker compose up -d --build api worker graph milvus
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose exec -T api curl -fsS http://localhost:5050/api/system/ready; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - name: Seed demo knowledge
+        run: docker compose exec -T api uv run python scripts/seed_enterprise_policy_kb.py --bind-agent
+      - name: Live Agent Eval smoke
+        run: docker compose exec -T api uv run python -m yuxi.evaluation.enterprise.runner --limit 5 --output /tmp/enterprise-ci-smoke
+      - name: Stop integration services
+        if: always()
+        run: docker compose down

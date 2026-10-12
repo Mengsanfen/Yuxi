@@ -15,6 +15,12 @@ async def test_health_endpoint_is_public(test_client):
     assert response.json()["status"] == "ok"
 
 
+async def test_readiness_endpoint_checks_critical_dependencies(test_client):
+    response = await test_client.get("/api/system/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "checks": {"postgres": True, "redis": True}}
+
+
 async def test_info_endpoint_is_public(test_client):
     response = await test_client.get("/api/system/info")
     assert response.status_code == 200
@@ -49,3 +55,5 @@ async def test_admin_can_fetch_tools_with_config_guide_field(test_client, admin_
     assert isinstance(payload["data"], list)
     assert payload["data"]
     assert "config_guide" in payload["data"][0]
+    enterprise_order_tool = next(tool for tool in payload["data"] if tool["id"] == "enterprise_get_order_by_no")
+    assert [arg["name"] for arg in enterprise_order_tool["args"]] == ["order_no"]

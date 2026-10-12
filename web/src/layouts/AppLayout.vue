@@ -1,16 +1,18 @@
 <script setup>
-import { ref, reactive, onMounted, computed, provide, watch } from 'vue'
+import { ref, reactive, onMounted, computed, defineAsyncComponent, provide, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { GithubOutlined } from '@ant-design/icons-vue'
 import {
   LibraryBig,
   BarChart3,
   ClipboardList,
   Blocks,
   Box,
+  Headphones,
   PanelLeftClose,
   PanelLeftOpen,
-  MessageCirclePlus
+  MessageCirclePlus,
+  ShieldCheck,
+  Activity
 } from 'lucide-vue-next'
 
 import { useConfigStore } from '@/stores/config'
@@ -22,10 +24,10 @@ import { useTaskerStore } from '@/stores/tasker'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import UserInfoComponent from '@/components/UserInfoComponent.vue'
-import DebugComponent from '@/components/DebugComponent.vue'
-import TaskCenterDrawer from '@/components/TaskCenterDrawer.vue'
-import SettingsModal from '@/components/SettingsModal.vue'
 import ConversationNavSection from '@/components/ConversationNavSection.vue'
+
+const TaskCenterDrawer = defineAsyncComponent(() => import('@/components/TaskCenterDrawer.vue'))
+const SettingsModal = defineAsyncComponent(() => import('@/components/SettingsModal.vue'))
 
 const configStore = useConfigStore()
 const agentStore = useAgentStore()
@@ -43,13 +45,6 @@ const layoutSettings = reactive({
   useTopBar: false // 是否使用顶栏
 })
 
-// Add state for GitHub stars
-const githubStars = ref(0)
-const isLoadingStars = ref(false)
-
-// Add state for debug modal
-const showDebugModal = ref(false)
-
 // Add state for settings modal
 const showSettingsModal = ref(false)
 
@@ -58,11 +53,6 @@ const sidebarCollapsed = ref(false)
 // Provide settings modal methods to child components
 const openSettingsModal = () => {
   showSettingsModal.value = true
-}
-
-// Handle debug modal close
-const handleDebugModalClose = () => {
-  showDebugModal.value = false
 }
 
 const getRemoteConfig = async () => {
@@ -82,21 +72,6 @@ const getRemoteDatabase = async () => {
   }
 }
 
-// Fetch GitHub stars count
-const fetchGithubStars = async () => {
-  try {
-    isLoadingStars.value = true
-    // 公共API，可以直接使用fetch
-    const response = await fetch('https://api.github.com/repos/xerrors/Yuxi')
-    const data = await response.json()
-    githubStars.value = data.stargazers_count
-  } catch (error) {
-    console.error('获取GitHub stars失败:', error)
-  } finally {
-    isLoadingStars.value = false
-  }
-}
-
 onMounted(async () => {
   // 加载信息配置与知识库数据无依赖，可并行
   await Promise.all([infoStore.loadInfoConfig(), getRemoteDatabase()])
@@ -105,7 +80,6 @@ onMounted(async () => {
   if (userStore.isAdmin) {
     await getRemoteConfig()
     taskerStore.loadTasks()
-    fetchGithubStars() // Fetch GitHub stars on mount
   }
 })
 
@@ -114,7 +88,7 @@ const router = useRouter()
 
 const activeTaskCount = computed(() => activeCountRef.value || 0)
 const organizationName = computed(() => {
-  return infoStore.organization.name || infoStore.branding.name || 'Yuxi'
+  return infoStore.organization.name || infoStore.branding.name || 'NexaMind'
 })
 
 // 下面是导航菜单部分，添加智能体项
@@ -156,6 +130,27 @@ const mainList = computed(() => {
       path: '/model-config',
       icon: Box,
       activeIcon: Box
+    })
+
+    items.push({
+      name: '审批中心',
+      path: '/enterprise/approvals',
+      icon: ShieldCheck,
+      activeIcon: ShieldCheck
+    })
+
+    items.push({
+      name: '售后工单',
+      path: '/enterprise/tickets',
+      icon: Headphones,
+      activeIcon: Headphones
+    })
+
+    items.push({
+      name: '运行追踪',
+      path: '/enterprise/traces',
+      icon: Activity,
+      activeIcon: Activity
     })
 
     items.push({
@@ -319,18 +314,6 @@ provide('settingsModal', {
         />
       </div>
       <div class="foo">
-        <div class="github nav-item" @click.stop>
-          <a-tooltip placement="right" :open="sidebarCollapsed ? undefined : false">
-            <template #title>欢迎 Star</template>
-            <a href="https://github.com/xerrors/Yuxi" target="_blank" class="github-link">
-              <GithubOutlined class="icon" />
-              <span class="nav-text">GitHub</span>
-              <span v-if="githubStars > 0" class="github-stars">
-                <span class="star-count">{{ (githubStars / 1000).toFixed(1) }}k</span>
-              </span>
-            </a>
-          </a-tooltip>
-        </div>
         <!-- 用户信息组件 -->
         <div class="nav-item user-info" @click.stop>
           <UserInfoComponent :show-role="!sidebarCollapsed">
@@ -365,21 +348,12 @@ provide('settingsModal', {
       <component :is="Component" v-else />
     </router-view>
 
-    <!-- Debug Modal -->
-    <a-modal
-      v-model:open="showDebugModal"
-      title="调试面板"
-      width="90%"
-      :footer="null"
-      @cancel="handleDebugModalClose"
-      :maskClosable="true"
-      :destroyOnClose="true"
-      class="debug-modal"
-    >
-      <DebugComponent />
-    </a-modal>
-    <TaskCenterDrawer v-if="userStore.isAdmin" />
-    <SettingsModal v-model:visible="showSettingsModal" @close="() => (showSettingsModal = false)" />
+    <TaskCenterDrawer v-if="userStore.isAdmin && isDrawerOpen" />
+    <SettingsModal
+      v-if="showSettingsModal"
+      v-model:visible="showSettingsModal"
+      @close="() => (showSettingsModal = false)"
+    />
   </div>
 </template>
 
@@ -447,7 +421,6 @@ div.header,
 
   .sidebar-brand,
   :deep(.conversation-nav-section:not(.sidebar-conversations)),
-  .github,
   .user-info {
     flex-shrink: 0;
   }
@@ -607,54 +580,6 @@ div.header,
       color: var(--main-color);
     }
 
-    &.github {
-      margin-bottom: 8px;
-      &:hover {
-        border-color: transparent;
-      }
-
-      .github-link {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        min-width: 0;
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: @sidebar-icon-size;
-        line-height: 1;
-      }
-
-      .github-stars {
-        display: flex;
-        align-items: center;
-        max-width: 48px;
-        margin-left: auto;
-        overflow: hidden;
-        font-size: 12px;
-        color: var(--gray-500);
-        white-space: nowrap;
-        transition:
-          opacity 0.12s ease,
-          max-width 0.18s ease;
-
-        .star-icon {
-          color: var(--color-warning-500);
-          font-size: 12px;
-          margin-right: 2px;
-        }
-
-        .star-count {
-          font-weight: 600;
-        }
-      }
-    }
-
     &.api-docs {
       padding: 10px 12px;
     }
@@ -791,18 +716,11 @@ div.header,
       width: @sidebar-item-height;
       padding: 0 10px;
 
-      .nav-text,
-      .github-stars {
+      .nav-text {
         max-width: 0;
         margin-left: 0;
         opacity: 0;
         pointer-events: none;
-      }
-
-      &.github {
-        .github-link {
-          justify-content: flex-start;
-        }
       }
 
       &.user-info {
@@ -810,6 +728,61 @@ div.header,
         :deep(.user-info-actions) {
           display: none;
         }
+      }
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .app-layout {
+    min-width: 0;
+  }
+
+  #app-router-view {
+    min-width: 0;
+  }
+
+  .header {
+    flex-basis: @sidebar-collapsed-width;
+    width: @sidebar-collapsed-width;
+    gap: 8px;
+
+    .sidebar-brand {
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .brand-link,
+    .nav-item {
+      justify-content: center;
+      width: @sidebar-item-height;
+      padding: 0 10px;
+    }
+
+    .brand-name,
+    .sidebar-toggle,
+    .nav-text,
+    .sidebar-conversations {
+      display: none;
+    }
+
+    .nav {
+      overflow-y: auto;
+    }
+
+    .fill {
+      display: none;
+    }
+
+    .foo {
+      margin-top: auto;
+    }
+
+    .nav-item.user-info {
+      padding: 0;
+
+      :deep(.user-info-actions) {
+        display: none;
       }
     }
   }
@@ -879,36 +852,6 @@ div.header,
     .text {
       margin-top: 0;
       font-size: 15px;
-    }
-
-    &.github {
-      padding: 8px 12px;
-
-      .icon {
-        margin-right: 0;
-        font-size: 18px;
-      }
-
-      &.active {
-        color: var(--main-color);
-      }
-
-      a {
-        display: flex;
-        align-items: center;
-      }
-
-      .github-stars {
-        display: flex;
-        align-items: center;
-        margin-left: 6px;
-
-        .star-icon {
-          color: var(--color-warning-500);
-          font-size: 14px;
-          margin-right: 2px;
-        }
-      }
     }
 
     &.theme-toggle-nav {

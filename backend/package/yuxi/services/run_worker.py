@@ -8,10 +8,12 @@ import os
 import time
 from dataclasses import dataclass, field
 
+from arq import cron
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from yuxi.repositories.agent_run_repository import TERMINAL_RUN_STATUSES, AgentRunRepository
 from yuxi.services.chat_service import stream_agent_chat
+from yuxi.services.enterprise_approval_recovery import reconcile_approval_resumes, retry_approval_resume
 from yuxi.services.mcp_service import ensure_builtin_mcp_servers_in_db
 from yuxi.services.run_queue_service import (
     append_run_stream_event,
@@ -108,8 +110,14 @@ async def _get_run(run_id: str):
         return await repo.get_run(run_id)
 
 
-async def append_run_event(run_id: str, event_type: str, payload: dict):
-    await append_run_stream_event(run_id, event_type, payload)
+async def append_run_event(run_id: str, event_type: str, payload: dict) -> bool:
+    """Publish an auxiliary SSE event without changing the business run outcome."""
+    try:
+        await append_run_stream_event(run_id, event_type, payload)
+    except Exception as exc:
+        logger.warning(f"Failed to publish run event {event_type} for {run_id}: {exc}")
+        return False
+    return True
 
 
 async def mark_run_running(run_id: str):
@@ -215,6 +223,7 @@ async def process_agent_run(ctx, run_id: str):
 
     meta = {
         "request_id": request_id,
+        "run_id": run_id,
         "query": query,
         "agent_id": agent_id,
         "server_model_name": config.get("model", agent_id),
@@ -275,7 +284,7 @@ async def process_agent_run(ctx, run_id: str):
                             error_message=chunk.get("message"),
                         )
                         terminal_set = True
-                    elif status == "ask_user_question_required":
+                    elif status in {"ask_user_question_required", "human_approval_required"}:
                         questions = chunk.get("questions") if isinstance(chunk, dict) else None
                         first_question = ""
                         if isinstance(questions, list) and questions:
@@ -286,8 +295,8 @@ async def process_agent_run(ctx, run_id: str):
                         await mark_run_terminal(
                             run_id,
                             "interrupted",
-                            error_type="ask_user_question_required",
-                            error_message=first_question or "需要用户回答问题",
+                            error_type=status,
+                            error_message=first_question or "需要人工处理",
                         )
                         terminal_set = True
 
@@ -371,11 +380,15 @@ async def _worker_startup(ctx):
 
 
 async def _worker_shutdown(ctx):
+    from yuxi.agents.buildin import agent_manager
+
+    await agent_manager.close_all()
     await pg_manager.close()
 
 
 class WorkerSettings:
-    functions = [process_agent_run]
+    functions = [process_agent_run, retry_approval_resume]
+    cron_jobs = [cron(reconcile_approval_resumes, minute=set(range(60)))]
     max_tries = 2
     retry_jobs = True
     job_timeout = 900

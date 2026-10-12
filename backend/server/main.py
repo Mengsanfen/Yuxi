@@ -41,10 +41,17 @@ app = FastAPI(lifespan=lifespan)
 # 所有业务接口统一挂载到 /api，具体分组在 server.routers 中集中注册。
 app.include_router(router, prefix="/api")
 
-# CORS 设置
+# The development origins are explicit; deployments can replace them with a comma-separated allowlist.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "YUXI_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

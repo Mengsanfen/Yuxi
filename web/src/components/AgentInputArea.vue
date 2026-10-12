@@ -91,11 +91,11 @@
           v-if="hasActiveThread"
           class="input-action-btn"
           :class="{ active: isPanelOpen }"
-          @click.stop="$emit('toggle-panel')"
-          title="查看文件"
+          @click.stop="emit('toggle-panel')"
+          :title="panelTitle"
         >
-          <FolderCode :size="18" />
-          <span>文件</span>
+          <component :is="panelIcon" :size="18" />
+          <span>{{ panelLabel }}</span>
         </button>
         <slot name="actions-left-extra"></slot>
       </div>
@@ -108,7 +108,7 @@ import { computed, ref, watch } from 'vue'
 import MessageInputComponent from '@/components/MessageInputComponent.vue'
 import ImagePreviewComponent from '@/components/ImagePreviewComponent.vue'
 import AttachmentOptionsComponent from '@/components/AttachmentOptionsComponent.vue'
-import { FolderCode, SquareCheck } from 'lucide-vue-next'
+import { Activity, FolderCode, SquareCheck } from 'lucide-vue-next'
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -126,6 +126,10 @@ const props = defineProps({
   supportsFileUpload: { type: Boolean, default: false },
   isPanelOpen: { type: Boolean, default: false },
   hasActiveThread: { type: Boolean, default: true },
+  panelType: {
+    type: String,
+    default: 'files'
+  },
   todos: {
     type: Array,
     default: () => []
@@ -154,6 +158,9 @@ const todoProgress = computed(() => {
   if (!totalTodoCount.value) return 0
   return Math.round((completedTodoCount.value / totalTodoCount.value) * 100)
 })
+const panelIcon = computed(() => (props.panelType === 'enterprise' ? Activity : FolderCode))
+const panelLabel = computed(() => (props.panelType === 'enterprise' ? '运行' : '文件'))
+const panelTitle = computed(() => (props.panelType === 'enterprise' ? '查看业务运行' : '查看文件'))
 
 watch(showTodoEntry, (visible) => {
   if (!visible) {

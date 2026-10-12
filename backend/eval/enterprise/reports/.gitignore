@@ -1,0 +1,5 @@
+*.json
+*.md
+!full_verified_2026-10-11/
+!full_verified_2026-10-11/*.json
+!full_verified_2026-10-11/*.md

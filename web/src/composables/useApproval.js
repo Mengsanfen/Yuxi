@@ -143,6 +143,16 @@ export function useApproval({ getThreadState, resetOnGoingConv, fetchThreadMessa
 
     threadState.isStreaming = false
 
+    if (chunk.status === 'human_approval_required') {
+      approvalState.showModal = false
+      approvalState.questions = []
+      approvalState.status = chunk.status
+      approvalState.threadId = chunk.thread_id || threadId
+      message.info('退款申请已进入人工审批，请等待管理员在审批中心处理')
+      fetchThreadMessages({ agentId: currentAgentId, threadId })
+      return true
+    }
+
     approvalState.showModal = true
     approvalState.questions = payload.questions
     approvalState.status = chunk.status || ''

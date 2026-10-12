@@ -75,3 +75,33 @@ def test_extract_agent_state_includes_artifacts():
     assert state["todos"] == [{"content": "done", "status": "completed"}]
     assert state["files"] == {"/tmp/demo.txt": {"content": ["x"]}}
     assert state["artifacts"] == ["/home/gem/user-data/outputs/demo.txt"]
+
+
+def test_extract_agent_state_includes_enterprise_runtime_fields():
+    state = extract_agent_state(
+        {
+            "intent": "refund_request",
+            "domain": "refund",
+            "action": "request",
+            "ticket_type": "unknown",
+            "security_signals": [],
+            "intent_confidence": 0.96,
+            "risk_level": "high",
+            "order_no": "NM-DEMO-2026-0008",
+            "refund_result": {"status": "pending_approval"},
+            "approval_result": {"id": 12, "status": "pending"},
+            "quality_result": {"passed": True, "risk": "low", "issues": []},
+        }
+    )
+
+    assert state["intent"] == "refund_request"
+    assert state["domain"] == "refund"
+    assert state["action"] == "request"
+    assert state["ticket_type"] == "unknown"
+    assert state["security_signals"] == []
+    assert state["intent_confidence"] == 0.96
+    assert state["risk_level"] == "high"
+    assert state["order_no"] == "NM-DEMO-2026-0008"
+    assert state["refund_result"]["status"] == "pending_approval"
+    assert state["approval_result"]["id"] == 12
+    assert state["quality_result"]["passed"] is True

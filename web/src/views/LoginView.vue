@@ -20,8 +20,8 @@
         <div class="brand-container" @click="goHome" style="cursor: pointer">
           <img v-if="brandLogo" :src="brandLogo" alt="logo" class="brand-logo" />
           <h1 class="brand-text">
-            <span v-if="brandOrgName" class="brand-org">{{ brandOrgName }}</span>
-            <span v-if="brandOrgName && brandName !== brandOrgName" class="brand-separator"></span>
+            <span v-if="showBrandOrgName" class="brand-org">{{ brandOrgName }}</span>
+            <span v-if="showBrandOrgName" class="brand-separator"></span>
             <span class="brand-main">{{ brandName }}</span>
           </h1>
         </div>
@@ -256,11 +256,6 @@
 
     <!-- 页面底部：版权信息等 -->
     <footer class="page-footer">
-      <div class="footer-links">
-        <a href="https://github.com/xerrors" target="_blank">联系我们</a>
-        <span class="divider">|</span>
-        <a href="https://github.com/xerrors/Yuxi" target="_blank">使用帮助</a>
-      </div>
       <div class="copyright">
         &copy; {{ new Date().getFullYear() }} {{ brandName }}. All Rights Reserved.
       </div>
@@ -302,13 +297,16 @@ const brandOrgName = computed(() => {
 })
 const brandName = computed(() => {
   const orgName = brandOrgName.value
-  const brandNameRaw = infoStore.branding?.name?.trim() || 'Yuxi'
+  const brandNameRaw = infoStore.branding?.name?.trim() || 'NexaMind'
 
   if (orgName && brandNameRaw && orgName !== brandNameRaw) {
     return brandNameRaw
   }
 
   return orgName || brandNameRaw
+})
+const showBrandOrgName = computed(() => {
+  return Boolean(brandOrgName.value && brandName.value !== brandOrgName.value)
 })
 const userAgreementUrl = computed(() => {
   return infoStore.footer?.user_agreement_url?.trim() || ''

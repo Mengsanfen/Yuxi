@@ -169,7 +169,8 @@
 <script setup>
 import { reactive, onMounted, watch } from 'vue'
 import { notification, Modal } from 'ant-design-vue'
-import { departmentApi, apiSuperAdminGet } from '@/apis'
+import { apiSuperAdminGet } from '@/apis/base'
+import { departmentApi } from '@/apis/department_api'
 import { Delete as Trash2, Edit3 as Pencil, Plus, Users } from 'lucide-vue-next'
 
 // 表格列定义

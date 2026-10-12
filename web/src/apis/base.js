@@ -54,7 +54,11 @@ export async function apiRequest(url, options = {}, requiresAuth = true, respons
 
       try {
         errorData = await response.json()
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        const detail = errorData.detail
+        errorMessage =
+          (typeof detail === 'string' ? detail : detail?.message || detail?.error?.message) ||
+          errorData.message ||
+          errorMessage
         console.log('API错误详情:', errorData)
 
         // 如果是422错误，打印更详细的信息
@@ -87,8 +91,9 @@ export async function apiRequest(url, options = {}, requiresAuth = true, respons
         // 检查是否是token过期
         const isTokenExpired =
           errorData &&
-          (errorData.detail?.includes('令牌已过期') ||
-            errorData.detail?.includes('token expired') ||
+          ((typeof errorData.detail === 'string' &&
+            (errorData.detail.includes('令牌已过期') ||
+              errorData.detail.includes('token expired'))) ||
             errorMessage?.includes('令牌已过期') ||
             errorMessage?.includes('token expired'))
 

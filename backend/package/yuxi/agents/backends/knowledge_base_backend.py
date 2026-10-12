@@ -122,7 +122,7 @@ def _materialize_text_view(content: bytes, file_path: str, *, offset: int = 0, l
 
 
 async def resolve_visible_knowledge_bases_for_context(context) -> list[dict[str, Any]]:
-    user_id = getattr(context, "user_id", None)
+    user_id = getattr(context, "account_user_id", None) or getattr(context, "user_id", None)
     if not user_id:
         setattr(context, "_visible_knowledge_bases", [])
         return []
@@ -132,13 +132,7 @@ async def resolve_visible_knowledge_bases_for_context(context) -> list[dict[str,
         setattr(context, "_visible_knowledge_bases", [])
         return []
 
-    try:
-        raw_user_id = int(user_id)
-    except (TypeError, ValueError):
-        setattr(context, "_visible_knowledge_bases", [])
-        return []
-
-    result = await knowledge_base.get_databases_by_raw_id(raw_user_id)
+    result = await knowledge_base.get_databases_by_user_id(str(user_id))
     databases = [db for db in (result.get("databases") or []) if str(db.get("name") or "").strip() in enabled_names]
     setattr(context, "_visible_knowledge_bases", databases)
     return databases

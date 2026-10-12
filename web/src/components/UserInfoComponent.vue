@@ -30,9 +30,6 @@
             </div>
           </a-menu-item>
           <a-menu-divider />
-          <a-menu-item key="docs" @click="openDocs" :icon="BookOpenIcon">
-            <span class="menu-text">文档中心</span>
-          </a-menu-item>
           <a-menu-item
             key="theme"
             @click="toggleTheme"
@@ -177,19 +174,17 @@
     </a-modal>
 
     <!-- 调试面板 Modal -->
-    <DebugComponent v-model:show="showDebug" />
+    <DebugComponent v-if="showDebug" v-model:show="showDebug" />
   </div>
 </template>
 
 <script setup>
-import { computed, ref, inject, h, useSlots, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, inject, h, useSlots, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import DebugComponent from '@/components/DebugComponent.vue'
 import { message } from 'ant-design-vue'
 import {
   CircleUser,
-  BookOpen,
   Sun,
   Moon,
   LogOut,
@@ -199,19 +194,20 @@ import {
 } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 
+const DebugComponent = defineAsyncComponent(() => import('@/components/DebugComponent.vue'))
+
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 const slots = useSlots()
 
 // 预定义图标组件，避免 Vue 警告
-const BookOpenIcon = h(BookOpen, { size: '16' })
 const SunIcon = h(Sun, { size: '16' })
 const MoonIcon = h(Moon, { size: '16' })
 const TerminalIcon = h(Terminal, { size: '16' })
 const SettingsIcon = h(Settings, { size: '16' })
 const LogOutIcon = h(LogOut, { size: '16' })
-const DEFAULT_AVATAR_URL = 'https://xerrors.oss-cn-shanghai.aliyuncs.com/github/default.jpeg'
+const DEFAULT_AVATAR_URL = '/avatar.jpg'
 
 // 调试面板状态
 const showDebug = ref(false)
@@ -289,10 +285,6 @@ const logout = () => {
 // 前往登录页
 const goToLogin = () => {
   router.push('/login')
-}
-
-const openDocs = () => {
-  window.open('https://xerrors.github.io/Yuxi/', '_blank', 'noopener,noreferrer')
 }
 
 const toggleTheme = () => {

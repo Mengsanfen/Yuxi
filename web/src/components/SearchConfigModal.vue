@@ -254,7 +254,8 @@ watch(
     if (newVal && props.databaseId) {
       loadQueryParams()
     }
-  }
+  },
+  { immediate: true }
 )
 </script>
 

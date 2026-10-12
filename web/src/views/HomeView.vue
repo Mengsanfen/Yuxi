@@ -224,8 +224,8 @@ const checkHealth = async () => {
   }
 
   error.value = {
-    title: '服务连接失败',
-    message: '后端服务无法响应，请检查服务是否正常运行'
+    title: '服务暂不可用',
+    message: '后端或依赖服务未就绪，请检查 Docker 服务状态'
   }
   throw lastError
 }

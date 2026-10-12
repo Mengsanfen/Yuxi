@@ -15,6 +15,7 @@ export * from './mcp_api' // MCP API
 export * from './skill_api' // Skills API
 export * from './subagent_api' // SubAgent API
 export * from './tool_api' // 工具 API
+export * from './enterprise_api' // 企业客服业务 API
 
 // 导出基础工具函数
 export {

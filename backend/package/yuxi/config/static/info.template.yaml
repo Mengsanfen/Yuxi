@@ -3,15 +3,15 @@
 
 # 组织信息
 organization:
-  name: "DreamOS"            # 完整组织名称
+  name: "NexaMind"           # 完整组织名称
   logo: "/favicon.svg"       # Logo文件路径（放在 web/public 目录下）
   avatar: "/avatar.jpg"      # 头像文件路径（放在 web/public 目录下）
   login_bg: "/login-bg.jpg"  # 登录背景图片路径（放在 web/public 目录下）
 
 # 项目信息
 branding:
-  name: "DreamOS"
-  title: "DreamOS"     # 系统标题
+  name: "NexaMind"
+  title: "NexaMind"     # 系统标题
   subtitle: "融合 RAG、知识图谱与智能体编排的知识中枢"          # 副标题（subtitles 为空时使用）
   badge: "RAG · Knowledge Graph · Agent Workflow"
   subtitles:
@@ -43,6 +43,6 @@ features:
 
 # 页脚信息
 footer:
-  copyright: "© DreamOS 2026"
+  copyright: "© NexaMind 2026"
   user_agreement_url: "/protocols/user-agreement.template.html"
   privacy_policy_url: "/protocols/privacy-policy.template.html"

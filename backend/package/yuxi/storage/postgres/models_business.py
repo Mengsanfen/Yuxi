@@ -1,6 +1,8 @@
 """PostgreSQL 业务数据模型 - 用户、部门、对话等相关表"""
 
-from datetime import timedelta
+from datetime import UTC, timedelta
+from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -8,10 +10,12 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum as SQLAlchemyEnum,
     Float,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -24,6 +28,84 @@ Base = declarative_base()
 
 MAX_LOGIN_FAILED_ATTEMPTS = 5
 LOGIN_LOCK_DURATION_SECONDS = 300
+
+
+class CustomerLevel(StrEnum):
+    STANDARD = "standard"
+    VIP = "vip"
+
+
+class RiskLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ProductStatus(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+class OrderStatus(StrEnum):
+    PENDING = "pending"
+    PAID = "paid"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    REFUNDED = "refunded"
+    CANCELLED = "cancelled"
+
+
+class RefundStatus(StrEnum):
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class TicketType(StrEnum):
+    AFTER_SALE = "after_sale"
+    COMPLAINT = "complaint"
+    INQUIRY = "inquiry"
+    LOGISTICS = "logistics"
+    REFUND = "refund"
+
+
+class TicketPriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class TicketStatus(StrEnum):
+    OPEN = "open"
+    PROCESSING = "processing"
+    WAITING_CUSTOMER = "waiting_customer"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
+class TicketSource(StrEnum):
+    MANUAL = "manual"
+    AGENT = "agent"
+    API = "api"
+
+
+class ApprovalBusinessType(StrEnum):
+    REFUND = "refund"
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+def _enum_value(value: StrEnum | str | None) -> str | None:
+    return value.value if isinstance(value, StrEnum) else value
+
+
+def _money_value(value: Decimal | None) -> str | None:
+    return format(value, ".2f") if value is not None else None
 
 
 class Department(Base):
@@ -763,4 +845,425 @@ class AgentRun(Base):
             "finished_at": format_utc_datetime(self.finished_at),
             "created_at": format_utc_datetime(self.created_at),
             "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class EnterpriseTraceEvent(Base):
+    """Sanitized, tenant-scoped execution event for enterprise agent traces."""
+
+    __tablename__ = "enterprise_trace_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trace_id = Column(String(64), nullable=False)
+    thread_id = Column(String(64), nullable=False)
+    run_id = Column(String(64), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    user_id = Column(String(64), nullable=False)
+    event_type = Column(String(40), nullable=False)
+    node_name = Column(String(64), nullable=True)
+    agent_name = Column(String(100), nullable=True)
+    business_type = Column(String(40), nullable=True)
+    business_id = Column(String(64), nullable=True)
+    risk_level = Column(String(16), nullable=True)
+    status = Column(String(32), nullable=False)
+    latency_ms = Column(Integer, nullable=True)
+    payload_summary = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+
+    __table_args__ = (
+        Index("ix_enterprise_trace_tenant_created", "tenant_id", "created_at"),
+        Index("ix_enterprise_trace_trace_created", "trace_id", "created_at"),
+        Index("ix_enterprise_trace_thread_created", "tenant_id", "thread_id", "created_at"),
+        Index("ix_enterprise_trace_run_id", "run_id"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        created_at = self.created_at
+        if created_at is not None and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=UTC)
+        return {
+            "id": self.id,
+            "trace_id": self.trace_id,
+            "thread_id": self.thread_id,
+            "run_id": self.run_id,
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+            "event_type": self.event_type,
+            "node_name": self.node_name,
+            "agent_name": self.agent_name,
+            "business_type": self.business_type,
+            "business_id": self.business_id,
+            "risk_level": self.risk_level,
+            "status": self.status,
+            "latency_ms": self.latency_ms,
+            "payload_summary": self.payload_summary or {},
+            "created_at": format_utc_datetime(created_at),
+        }
+
+
+class Customer(Base):
+    """Enterprise customer isolated by department tenant."""
+
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(32), nullable=True)
+    level = Column(
+        SQLAlchemyEnum(CustomerLevel, name="customer_level_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=CustomerLevel.STANDARD,
+    )
+    risk_level = Column(
+        SQLAlchemyEnum(RiskLevel, name="customer_risk_level_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=RiskLevel.LOW,
+    )
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "email", name="uq_customers_tenant_email"),
+        UniqueConstraint("tenant_id", "phone", name="uq_customers_tenant_phone"),
+        Index("ix_customers_tenant_created", "tenant_id", "created_at"),
+        Index("ix_customers_tenant_name", "tenant_id", "name"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "name": self.name,
+            "email": self.email,
+            "phone": self.phone,
+            "level": _enum_value(self.level),
+            "risk_level": _enum_value(self.risk_level),
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class Product(Base):
+    """Enterprise product catalog item."""
+
+    __tablename__ = "products"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    sku = Column(String(64), nullable=False)
+    name = Column(String(150), nullable=False)
+    category = Column(String(100), nullable=False)
+    price = Column(Numeric(12, 2), nullable=False)
+    status = Column(
+        SQLAlchemyEnum(ProductStatus, name="product_status_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=ProductStatus.ACTIVE,
+    )
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "sku", name="uq_products_tenant_sku"),
+        Index("ix_products_tenant_status", "tenant_id", "status"),
+        Index("ix_products_tenant_category", "tenant_id", "category"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "sku": self.sku,
+            "name": self.name,
+            "category": self.category,
+            "price": _money_value(self.price),
+            "status": _enum_value(self.status),
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class Order(Base):
+    """Customer order with logistics summary fields."""
+
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    order_no = Column(String(64), nullable=False)
+    status = Column(
+        SQLAlchemyEnum(OrderStatus, name="order_status_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=OrderStatus.PENDING,
+    )
+    total_amount = Column(Numeric(12, 2), nullable=False)
+    paid_amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    logistics_company = Column(String(100), nullable=True)
+    tracking_no = Column(String(100), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+    paid_at = Column(DateTime, nullable=True)
+    shipped_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "order_no", name="uq_orders_tenant_order_no"),
+        Index("ix_orders_tenant_customer_created", "tenant_id", "customer_id", "created_at"),
+        Index("ix_orders_tenant_status", "tenant_id", "status"),
+        Index("ix_orders_tenant_tracking", "tenant_id", "tracking_no"),
+    )
+
+    def to_dict(self, include_items: bool = True) -> dict[str, Any]:
+        data = {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "customer_id": self.customer_id,
+            "order_no": self.order_no,
+            "status": _enum_value(self.status),
+            "total_amount": _money_value(self.total_amount),
+            "paid_amount": _money_value(self.paid_amount),
+            "logistics_company": self.logistics_company,
+            "tracking_no": self.tracking_no,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+            "paid_at": format_utc_datetime(self.paid_at),
+            "shipped_at": format_utc_datetime(self.shipped_at),
+            "delivered_at": format_utc_datetime(self.delivered_at),
+        }
+        if include_items:
+            data["items"] = [item.to_dict() for item in self.items]
+        return data
+
+
+class OrderItem(Base):
+    """Line item for an enterprise order."""
+
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Numeric(12, 2), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    order = relationship("Order", back_populates="items")
+
+    __table_args__ = (
+        UniqueConstraint("order_id", "product_id", name="uq_order_items_order_product"),
+        Index("ix_order_items_tenant_order", "tenant_id", "order_id"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "order_id": self.order_id,
+            "product_id": self.product_id,
+            "quantity": self.quantity,
+            "unit_price": _money_value(self.unit_price),
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class Refund(Base):
+    """Refund request and deterministic risk decision result."""
+
+    __tablename__ = "refunds"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
+    reason = Column(Text, nullable=False)
+    status = Column(
+        SQLAlchemyEnum(RefundStatus, name="refund_status_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+    )
+    risk_level = Column(
+        SQLAlchemyEnum(RiskLevel, name="refund_risk_level_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+    )
+    requires_approval = Column(Boolean, nullable=False, default=False)
+    approved_by = Column(String(64), nullable=True)
+    idempotency_key = Column(String(64), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_refunds_tenant_idempotency"),
+        Index(
+            "uq_refunds_tenant_order_active",
+            "tenant_id",
+            "order_id",
+            unique=True,
+            postgresql_where=status != RefundStatus.REJECTED,
+        ),
+        Index("ix_refunds_tenant_order", "tenant_id", "order_id"),
+        Index("ix_refunds_tenant_status", "tenant_id", "status"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "order_id": self.order_id,
+            "customer_id": self.customer_id,
+            "amount": _money_value(self.amount),
+            "reason": self.reason,
+            "status": _enum_value(self.status),
+            "risk_level": _enum_value(self.risk_level),
+            "requires_approval": bool(self.requires_approval),
+            "approved_by": self.approved_by,
+            "idempotency_key": self.idempotency_key,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class Ticket(Base):
+    """Customer-service ticket with an enforced status machine."""
+
+    __tablename__ = "tickets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    type = Column(
+        SQLAlchemyEnum(TicketType, name="ticket_type_enum", native_enum=False, create_constraint=True), nullable=False
+    )
+    priority = Column(
+        SQLAlchemyEnum(TicketPriority, name="ticket_priority_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=TicketPriority.MEDIUM,
+    )
+    status = Column(
+        SQLAlchemyEnum(TicketStatus, name="ticket_status_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=TicketStatus.OPEN,
+    )
+    summary = Column(Text, nullable=False)
+    assignee = Column(String(64), nullable=True)
+    source = Column(
+        SQLAlchemyEnum(TicketSource, name="ticket_source_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=TicketSource.MANUAL,
+    )
+    idempotency_key = Column(String(64), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_tickets_tenant_idempotency"),
+        Index("ix_tickets_tenant_customer", "tenant_id", "customer_id"),
+        Index("ix_tickets_tenant_status_priority", "tenant_id", "status", "priority"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "customer_id": self.customer_id,
+            "order_id": self.order_id,
+            "type": _enum_value(self.type),
+            "priority": _enum_value(self.priority),
+            "status": _enum_value(self.status),
+            "summary": self.summary,
+            "assignee": self.assignee,
+            "source": _enum_value(self.source),
+            "idempotency_key": self.idempotency_key,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+        }
+
+
+class ApprovalTask(Base):
+    """Human approval task linked to a high-risk business action."""
+
+    __tablename__ = "approval_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    business_type = Column(
+        SQLAlchemyEnum(
+            ApprovalBusinessType,
+            name="approval_business_type_enum",
+            native_enum=False,
+            create_constraint=True,
+        ),
+        nullable=False,
+    )
+    business_id = Column(Integer, nullable=False)
+    requested_by = Column(String(64), nullable=False)
+    status = Column(
+        SQLAlchemyEnum(ApprovalStatus, name="approval_status_enum", native_enum=False, create_constraint=True),
+        nullable=False,
+        default=ApprovalStatus.PENDING,
+    )
+    reviewer = Column(String(64), nullable=True)
+    review_comment = Column(Text, nullable=True)
+    idempotency_key = Column(String(64), nullable=False)
+    thread_id = Column(String(64), nullable=True)
+    agent_id = Column(String(64), nullable=True)
+    agent_config_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now_naive)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_approval_tasks_tenant_idempotency"),
+        Index("ix_approval_tasks_tenant_status", "tenant_id", "status"),
+        Index("ix_approval_tasks_business", "tenant_id", "business_type", "business_id"),
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "business_type": _enum_value(self.business_type),
+            "business_id": self.business_id,
+            "requested_by": self.requested_by,
+            "status": _enum_value(self.status),
+            "reviewer": self.reviewer,
+            "review_comment": self.review_comment,
+            "idempotency_key": self.idempotency_key,
+            "thread_id": self.thread_id,
+            "agent_id": self.agent_id,
+            "agent_config_id": self.agent_config_id,
+            "created_at": format_utc_datetime(self.created_at),
+            "updated_at": format_utc_datetime(self.updated_at),
+            "reviewed_at": format_utc_datetime(self.reviewed_at),
+        }
+
+
+class ApprovalResume(Base):
+    """Durable Agent resume state, separate from the committed approval decision."""
+
+    __tablename__ = "approval_resumes"
+
+    approval_task_id = Column(Integer, ForeignKey("approval_tasks.id"), primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    status = Column(String(16), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)
+    resumed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
+
+    __table_args__ = (Index("ix_approval_resumes_tenant_status", "tenant_id", "status"),)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "attempts": self.attempts,
+            "last_error": self.last_error,
+            "resumed_at": format_utc_datetime(self.resumed_at),
         }

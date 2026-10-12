@@ -17,16 +17,35 @@ if str(PROJECT_ROOT) not in sys.path:
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 load_dotenv(PROJECT_ROOT / "test/.env.test", override=False)
 
+from yuxi.services.identity_seed_service import DEFAULT_SEED_PASSWORD, DEFAULT_USERS  # noqa: E402
+
 E2E_BASE_URL = os.getenv("TEST_BASE_URL", os.getenv("API_BASE_URL", "http://localhost:5050")).rstrip("/")
-E2E_USERNAME = os.getenv("E2E_USERNAME") or os.getenv("TEST_USERNAME")
-E2E_PASSWORD = os.getenv("E2E_PASSWORD") or os.getenv("TEST_PASSWORD")
+DEFAULT_DEMO_ACCOUNTS_FLAG = "true" if os.getenv("RUNNING_IN_DOCKER") == "true" else "false"
+DEMO_ACCOUNTS_ENABLED = os.getenv("YUXI_SEED_DEFAULT_ACCOUNTS", DEFAULT_DEMO_ACCOUNTS_FLAG).lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+DEMO_SUPERADMIN = next(item for item in DEFAULT_USERS if item.role == "superadmin")
+E2E_USERNAME = (
+    os.getenv("E2E_USERNAME")
+    or os.getenv("TEST_USERNAME")
+    or (DEMO_SUPERADMIN.user_id if DEMO_ACCOUNTS_ENABLED else None)
+)
+E2E_PASSWORD = (
+    os.getenv("E2E_PASSWORD")
+    or os.getenv("TEST_PASSWORD")
+    or (DEFAULT_SEED_PASSWORD if DEMO_ACCOUNTS_ENABLED else None)
+)
 E2E_TIMEOUT = httpx.Timeout(300.0, connect=10.0)
 
 
 def _require_e2e_credentials() -> tuple[str, str]:
     if not E2E_USERNAME or not E2E_PASSWORD:
         pytest.skip(
-            "E2E credentials are not configured via E2E_USERNAME / E2E_PASSWORD or TEST_USERNAME / TEST_PASSWORD."
+            "E2E credentials are not configured. Set E2E_USERNAME / E2E_PASSWORD, TEST_USERNAME / "
+            "TEST_PASSWORD, or enable the local seeded demo account with YUXI_DEFAULT_ACCOUNT_PASSWORD."
         )
     return E2E_USERNAME, E2E_PASSWORD
 

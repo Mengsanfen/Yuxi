@@ -6,11 +6,13 @@ import os
 sys.path.insert(0, os.getcwd())
 
 from yuxi.services.chat_service import (
+    _build_runtime_identity_context,
     _normalize_interrupt_options,
     _normalize_interrupt_questions,
     _build_ask_user_question_payload,
     _coerce_interrupt_payload,
 )
+from yuxi.storage.postgres.models_business import User
 
 
 class TestNormalizeInterruptOptions:
@@ -168,6 +170,46 @@ class TestBuildAskUserQuestionPayload:
 
         assert result["questions"][0]["question_id"] != ""
         assert len(result["questions"][0]["question_id"]) > 0
+
+    def test_enterprise_approval_metadata_is_preserved(self):
+        info = {
+            "source": "enterprise_refund_approval",
+            "approval_task_id": 12,
+            "business_type": "refund",
+            "business_id": 15,
+            "risk_level": "high",
+            "amount": "299.00",
+            "questions": [{"question": "等待管理员审批", "allow_other": False}],
+        }
+
+        result = _build_ask_user_question_payload(info, "thread-approval")
+
+        assert result["source"] == "enterprise_refund_approval"
+        assert result["approval_task_id"] == 12
+        assert result["business_id"] == 15
+        assert result["risk_level"] == "high"
+        assert result["amount"] == "299.00"
+
+
+def test_runtime_identity_context_contains_tenant_role_and_agent_config():
+    current_user = User(id=8, department_id=3, role="admin", user_id="admin-user")
+
+    result = _build_runtime_identity_context(
+        current_user=current_user,
+        agent_id="EnterpriseServiceAgent",
+        agent_config_id=21,
+        thread_id="thread-runtime",
+    )
+
+    assert result == {
+        "user_id": "8",
+        "account_user_id": "admin-user",
+        "tenant_id": 3,
+        "user_role": "admin",
+        "agent_id": "EnterpriseServiceAgent",
+        "agent_config_id": 21,
+        "thread_id": "thread-runtime",
+    }
 
 
 class TestNormalizeInterruptQuestions:

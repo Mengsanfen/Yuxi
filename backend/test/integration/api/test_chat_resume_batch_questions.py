@@ -99,12 +99,10 @@ async def test_resume_rejects_empty_answer_text(test_client, admin_headers):
 async def test_resume_accepts_batch_answer_map(test_client, admin_headers):
     """Test that valid batch answer map is accepted."""
     thread_id = await _create_test_thread(test_client, admin_headers)
-    response = await test_client.post(
+    async with test_client.stream(
+        "POST",
         f"/api/chat/thread/{thread_id}/resume",
         json={"thread_id": thread_id, "answer": {"q1": "选项A", "q2": ["选项B", "选项C"]}},
         headers=admin_headers,
-    )
-
-    # Will return 200 if conversation exists and is in interrupt state,
-    # or 404 if conversation not found
-    assert response.status_code in (200, 404)
+    ) as response:
+        assert response.status_code == 200

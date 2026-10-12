@@ -58,6 +58,19 @@ class _FakeConvRepo:
         self.bound_agent_configs.append((thread_id, agent_config_id))
 
 
+class _FakeAgentConfigRepo:
+    def __init__(self, _db):
+        pass
+
+    async def get_by_id(self, config_id: int):
+        return SimpleNamespace(id=config_id)
+
+
+@pytest.fixture(autouse=True)
+def _mock_agent_config_repo(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(svc, "AgentConfigRepository", _FakeAgentConfigRepo)
+
+
 @pytest.mark.asyncio
 async def test_agent_chat_uses_invoke_messages_and_persists_langgraph_state(monkeypatch: pytest.MonkeyPatch):
     calls: dict[str, object] = {}
@@ -125,7 +138,7 @@ async def test_agent_chat_uses_invoke_messages_and_persists_langgraph_state(monk
         thread_id="thread-1",
         meta={"request_id": "req-1"},
         image_content=None,
-        current_user=SimpleNamespace(id="user-1", department_id="dept-1"),
+        current_user=SimpleNamespace(id="user-1", user_id="account-1", department_id="dept-1"),
         db=object(),
     )
 
@@ -140,7 +153,16 @@ async def test_agent_chat_uses_invoke_messages_and_persists_langgraph_state(monk
     assert len(invoke_messages) == 1
     assert isinstance(invoke_messages[0], HumanMessage)
     assert invoke_messages[0].content == "hello"
-    assert calls["invoke_input_context"] == {"temperature": 0.1, "user_id": "user-1", "thread_id": "thread-1"}
+    assert calls["invoke_input_context"] == {
+        "temperature": 0.1,
+        "user_id": "user-1",
+        "account_user_id": "account-1",
+        "thread_id": "thread-1",
+        "agent_config_id": 123,
+        "agent_id": "test-agent",
+        "tenant_id": "dept-1",
+        "user_role": "user",
+    }
     assert calls["invoke_kwargs"] == {
         "callbacks": ["handler-1"],
         "metadata": {"langfuse_user_id": "user-1", "langfuse_session_id": "thread-1"},
@@ -206,7 +228,7 @@ async def test_agent_chat_sync_returns_finished_even_when_state_has_interrupt(mo
         thread_id="thread-2",
         meta={"request_id": "req-2"},
         image_content=None,
-        current_user=SimpleNamespace(id="user-1", department_id="dept-1"),
+        current_user=SimpleNamespace(id="user-1", user_id="account-1", department_id="dept-1"),
         db=object(),
     )
 

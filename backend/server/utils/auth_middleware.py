@@ -22,6 +22,7 @@ PUBLIC_PATHS = [
     r"^/api/auth/initialize$",  # 初始化系统
     r"^/api$",  # Health Check
     r"^/api/system/health$",  # Health Check
+    r"^/api/system/ready$",  # Readiness Check
     r"^/api/system/info$",  # 获取系统信息配置
 ]
 

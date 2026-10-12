@@ -1,10 +1,15 @@
+import asyncio
 import os
 import aiofiles
 from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, Body, Depends, HTTPException
+from sqlalchemy import text
+from starlette.responses import JSONResponse
 
+from yuxi.services.run_queue_service import get_redis_client
+from yuxi.storage.postgres.manager import pg_manager
 from yuxi.storage.postgres.models_business import User
 from server.utils.auth_middleware import get_admin_user
 from yuxi import config, get_version
@@ -19,8 +24,43 @@ system = APIRouter(prefix="/system", tags=["system"])
 
 @system.get("/health")
 async def health_check():
-    """系统健康检查接口（公开接口）"""
+    """进程存活探针，不代表依赖服务可用。"""
     return {"status": "ok", "message": "服务正常运行", "version": get_version()}
+
+
+async def _check_postgres_ready() -> bool:
+    if not pg_manager._initialized or pg_manager.async_engine is None:
+        return False
+    try:
+        async with asyncio.timeout(2):
+            async with pg_manager.async_engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+
+async def _check_redis_ready() -> bool:
+    try:
+        async with asyncio.timeout(2):
+            redis = await get_redis_client()
+            await redis.ping()
+        return True
+    except Exception:
+        return False
+
+
+@system.get("/ready")
+async def readiness_check():
+    """只有数据库和运行队列都可用时才接收业务流量。"""
+    postgres_ready, redis_ready = await asyncio.gather(_check_postgres_ready(), _check_redis_ready())
+    checks = {"postgres": postgres_ready, "redis": redis_ready}
+    if all(checks.values()):
+        return {"status": "ok", "checks": checks}
+    return JSONResponse(
+        status_code=503,
+        content={"status": "not_ready", "message": "后端依赖服务暂不可用", "checks": checks},
+    )
 
 
 # =============================================================================

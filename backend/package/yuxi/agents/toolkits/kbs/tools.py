@@ -1,6 +1,7 @@
 """知识库工具模块"""
 
 import inspect
+from time import perf_counter
 from typing import Any
 
 from langchain_core.tools import tool
@@ -8,6 +9,7 @@ from langgraph.prebuilt.tool_node import ToolRuntime
 from pydantic import BaseModel, Field
 
 from yuxi import knowledge_base
+from yuxi.services.enterprise_trace_timing import record_tool_timing
 from yuxi.utils import logger
 
 # ========== 通用知识库工具函数 ==========
@@ -20,8 +22,7 @@ class ListKBsInput(BaseModel):
     dummy: str = Field(default="", description="Dummy parameter - ignore")  # Add this
 
 
-@tool(args_schema=ListKBsInput)
-async def list_kbs(dummy: str, runtime: ToolRuntime) -> str:  # Now has 2 params
+async def _list_kbs_impl(dummy: str, runtime: ToolRuntime) -> str:
     """列出当前用户可访问的知识库列表
 
     返回用户基于权限可访问的知识库名称列表。这个列表是根据用户的角色和部门信息过滤后的结果，
@@ -32,19 +33,16 @@ async def list_kbs(dummy: str, runtime: ToolRuntime) -> str:  # Now has 2 params
     """
     # 从 runtime.context 获取用户信息
     runtime_context = runtime.context
-    user_id = getattr(runtime_context, "user_id", None)
+    user_id = getattr(runtime_context, "account_user_id", None) or getattr(runtime_context, "user_id", None)
     if not user_id:
         return "无法获取用户信息"
-
-    # 打印 runtime—context 中的所有信息以进行调试
-    logger.debug(f"Runtime context: {runtime_context.__dict__}")
 
     # 获取用户在当前对话中启用的知识库列表
     enabled_kb_names = getattr(runtime_context, "knowledges", []) or []
 
     # 获取用户可访问的知识库列表（包含名称和描述）
     try:
-        result = await knowledge_base.get_databases_by_raw_id(user_id)
+        result = await knowledge_base.get_databases_by_user_id(str(user_id))
         all_kbs = result.get("databases", [])
     except Exception as e:
         logger.error(f"获取用户知识库列表失败: {e}")
@@ -69,6 +67,16 @@ async def list_kbs(dummy: str, runtime: ToolRuntime) -> str:  # Now has 2 params
         kb_list.append({"name": name, "description": desc})
 
     return kb_list
+
+
+@tool(args_schema=ListKBsInput)
+async def list_kbs(dummy: str, runtime: ToolRuntime) -> str:
+    """列出当前会话已启用且用户有权限访问的知识库。"""
+    started_at = perf_counter()
+    try:
+        return await _list_kbs_impl(dummy, runtime)
+    finally:
+        record_tool_timing("list_kbs", started_at)
 
 
 class GetMindmapInput(BaseModel):
@@ -187,28 +195,22 @@ def _find_query_target(
     retrievers: dict[str, Any],
     visible_kbs: list[dict[str, Any]],
 ) -> tuple[str | None, dict[str, Any] | None, str | None]:
-    if visible_kbs:
-        matched_kbs = [db for db in visible_kbs if str(db.get("name") or "").strip() == kb_name]
-        if not matched_kbs:
-            return None, None, f"知识库 '{kb_name}' 不存在或当前会话未启用"
-        if len(matched_kbs) > 1:
-            return None, None, f"知识库 '{kb_name}' 存在重名，请先调整名称后重试"
+    matched_kbs = [db for db in visible_kbs if str(db.get("name") or "").strip() == kb_name]
+    if not matched_kbs:
+        return None, None, f"知识库 '{kb_name}' 不存在或当前会话未启用"
+    if len(matched_kbs) > 1:
+        return None, None, f"知识库 '{kb_name}' 存在重名，请先调整名称后重试"
 
-        target_db_id = str(matched_kbs[0].get("db_id") or "")
-        target_info = retrievers.get(target_db_id)
-        if target_info is None:
-            return None, None, f"知识库 '{kb_name}' 不存在"
-        return target_db_id, target_info, None
-
-    for db_id, info in retrievers.items():
-        if info["name"] == kb_name:
-            return str(db_id), info, None
-
-    return None, None, f"知识库 '{kb_name}' 不存在"
+    target_db_id = str(matched_kbs[0].get("db_id") or "")
+    target_info = retrievers.get(target_db_id)
+    if target_info is None:
+        return None, None, f"知识库 '{kb_name}' 不存在"
+    return target_db_id, target_info, None
 
 
-@tool(args_schema=QueryKBInput)
-async def query_kb(kb_name: str, query_text: str, file_name: str | None = None, runtime: ToolRuntime = None) -> Any:
+async def _query_kb_impl(
+    kb_name: str, query_text: str, file_name: str | None = None, runtime: ToolRuntime = None
+) -> Any:
     """在指定知识库中检索内容
 
     当用户需要查询具体内容时使用此工具。根据关键词在知识库中检索相关文档片段。
@@ -272,6 +274,16 @@ async def query_kb(kb_name: str, query_text: str, file_name: str | None = None, 
     except Exception as e:
         logger.error(f"检索失败: {e}")
         return f"检索失败: {str(e)}"
+
+
+@tool(args_schema=QueryKBInput)
+async def query_kb(kb_name: str, query_text: str, file_name: str | None = None, runtime: ToolRuntime = None) -> Any:
+    """在当前会话可访问的知识库中检索相关文档片段。"""
+    started_at = perf_counter()
+    try:
+        return await _query_kb_impl(kb_name, query_text, file_name, runtime)
+    finally:
+        record_tool_timing("query_kb", started_at, retrieval=True)
 
 
 def get_common_kb_tools() -> list:

@@ -1,15 +1,17 @@
 <template>
   <div class="database-info-container">
-    <FileDetailModal />
+    <FileDetailModal v-if="state.fileDetailModalVisible" />
 
     <!-- 检索配置弹窗 -->
     <SearchConfigModal
+      v-if="searchConfigModalVisible"
       v-model="searchConfigModalVisible"
       :database-id="databaseId"
       @save="handleSearchConfigSave"
     />
 
     <FileUploadModal
+      v-if="addFilesModalVisible"
       v-model:visible="addFilesModalVisible"
       :folder-tree="folderTree"
       :current-folder-id="currentFolderId"
@@ -136,7 +138,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch, onUnmounted, computed } from 'vue'
+import { onMounted, ref, watch, onUnmounted, computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDatabaseStore } from '@/stores/database'
 import { useTaskerStore } from '@/stores/tasker'
@@ -145,14 +147,21 @@ import { SettingOutlined } from '@ant-design/icons-vue'
 import { Modal } from 'ant-design-vue'
 import KnowledgeBaseCard from '@/components/KnowledgeBaseCard.vue'
 import FileTable from '@/components/FileTable.vue'
-import FileDetailModal from '@/components/FileDetailModal.vue'
-import FileUploadModal from '@/components/FileUploadModal.vue'
-import KnowledgeGraphSection from '@/components/KnowledgeGraphSection.vue'
-import QuerySection from '@/components/QuerySection.vue'
-import MindMapSection from '@/components/MindMapSection.vue'
-import RAGEvaluationTab from '@/components/RAGEvaluationTab.vue'
-import EvaluationBenchmarks from '@/components/EvaluationBenchmarks.vue'
-import SearchConfigModal from '@/components/SearchConfigModal.vue'
+
+const FileDetailModal = defineAsyncComponent(() => import('@/components/FileDetailModal.vue'))
+const FileUploadModal = defineAsyncComponent(() => import('@/components/FileUploadModal.vue'))
+const KnowledgeGraphSection = defineAsyncComponent(
+  () => import('@/components/KnowledgeGraphSection.vue')
+)
+const QuerySection = defineAsyncComponent(() => import('@/components/QuerySection.vue'))
+const MindMapSection = defineAsyncComponent(() => import('@/components/MindMapSection.vue'))
+const RAGEvaluationTab = defineAsyncComponent(() => import('@/components/RAGEvaluationTab.vue'))
+const EvaluationBenchmarks = defineAsyncComponent(
+  () => import('@/components/EvaluationBenchmarks.vue')
+)
+const SearchConfigModal = defineAsyncComponent(
+  () => import('@/components/SearchConfigModal.vue')
+)
 
 const route = useRoute()
 const store = useDatabaseStore()

@@ -15,10 +15,10 @@ def _extract_tool_info(tool_obj) -> dict:
         "args": [],
     }
 
-    if hasattr(tool_obj, "args_schema") and tool_obj.args_schema:
-        schema = tool_obj.args_schema
-        if hasattr(schema, "schema"):
-            schema = schema.schema()
+    if hasattr(tool_obj, "tool_call_schema") and tool_obj.tool_call_schema:
+        schema = tool_obj.tool_call_schema
+        if hasattr(schema, "model_json_schema"):
+            schema = schema.model_json_schema()
         for arg_name, arg_info in schema.get("properties", {}).items():
             info["args"].append(
                 {
@@ -46,6 +46,7 @@ def _ensure_metadata_loaded():
     all_tools = get_all_tool_instances()
     extra_meta = get_all_extra_metadata()
 
+    metadata_cache = []
     for tool in all_tools:
         tool_name = tool.name
         runtime_info = _extract_tool_info(tool)
@@ -65,8 +66,9 @@ def _ensure_metadata_loaded():
             runtime_info["tags"] = []
             runtime_info["config_guide"] = ""
 
-        _metadata_cache.append(runtime_info)
+        metadata_cache.append(runtime_info)
 
+    _metadata_cache = metadata_cache
     logger.info(f"Tool service loaded {len(_metadata_cache)} tools (lazy load)")
 
 

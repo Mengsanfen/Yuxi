@@ -84,6 +84,31 @@ const router = createRouter({
       ]
     },
     {
+      path: '/enterprise',
+      name: 'enterprise',
+      component: AppLayout,
+      children: [
+        {
+          path: 'approvals',
+          name: 'EnterpriseApprovals',
+          component: () => import('../views/ApprovalView.vue'),
+          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: 'tickets',
+          name: 'EnterpriseTickets',
+          component: () => import('../views/TicketView.vue'),
+          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+        },
+        {
+          path: 'traces',
+          name: 'EnterpriseTraces',
+          component: () => import('../views/EnterpriseTraceView.vue'),
+          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+        }
+      ]
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: AppLayout,

@@ -40,8 +40,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, defineExpose, watch } from 'vue'
-import * as echarts from 'echarts'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { echarts } from '@/utils/echarts'
 import { dashboardApi } from '@/apis/dashboard_api'
 import { getColorByIndex, truncateLegend } from '@/utils/chartColors'
 import { useThemeStore } from '@/stores/theme'

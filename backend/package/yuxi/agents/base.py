@@ -116,7 +116,7 @@ class BaseAgent:
 
         async for mode, payload in graph.astream(
             {"messages": messages},
-            stream_mode=["messages", "values"],
+            stream_mode=["messages", "values", "updates"],
             context=context,
             config=input_config,
         ):
@@ -248,6 +248,14 @@ class BaseAgent:
             conn.is_alive = lambda: True
         self._async_conn = conn
         return self._async_conn
+
+    async def close(self) -> None:
+        """释放 Agent 自有的 SQLite checkpoint 连接。"""
+        if self._async_conn is not None:
+            await self._async_conn.close()
+            self._async_conn = None
+        self.checkpointer = None
+        self.graph = None
 
     async def get_aio_memory(self) -> AsyncSqliteSaver:
         """获取异步存储实例"""

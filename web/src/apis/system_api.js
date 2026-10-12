@@ -14,7 +14,7 @@ export const healthApi = {
    * 系统健康检查（公开接口）
    * @returns {Promise} - 健康检查结果
    */
-  checkHealth: () => apiGet('/api/system/health', {}, false),
+  checkHealth: () => apiGet('/api/system/ready', {}, false),
 
   /**
    * OCR服务健康检查
